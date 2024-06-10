@@ -1,0 +1,30 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.29318.209
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Infrakit", "Infrakit.csproj", "{015500F3-9201-4B7F-B00A-5C492CF96620}"
+EndProject
+Project("{54435603-DBB4-11D2-8724-00A0C9A8B90C}") = "Infrakit_Setup", "..\Infrakit_Setup\Infrakit_Setup.vdproj", "{3E90EDF3-EEBE-4C47-9495-5B1F3B0371B3}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{015500F3-9201-4B7F-B00A-5C492CF96620}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{015500F3-9201-4B7F-B00A-5C492CF96620}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{015500F3-9201-4B7F-B00A-5C492CF96620}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{015500F3-9201-4B7F-B00A-5C492CF96620}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3E90EDF3-EEBE-4C47-9495-5B1F3B0371B3}.Debug|Any CPU.ActiveCfg = Debug
+		{3E90EDF3-EEBE-4C47-9495-5B1F3B0371B3}.Debug|Any CPU.Build.0 = Debug
+		{3E90EDF3-EEBE-4C47-9495-5B1F3B0371B3}.Release|Any CPU.ActiveCfg = Release
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {D316147E-5A41-4547-AD98-98A5D047C7C7}
+	EndGlobalSection
+EndGlobal
