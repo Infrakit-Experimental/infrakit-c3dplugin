@@ -1,0 +1,14 @@
+C:\Users\raimo\OneDrive - AS Infragate Eesti\Endaprojektid\Excel REST API\AutoCAD\Infrakit\bin\Debug\Infrakit.dll
+C:\Users\raimo\OneDrive - AS Infragate Eesti\Endaprojektid\Excel REST API\AutoCAD\Infrakit\bin\Debug\Infrakit.pdb
+C:\Users\raimo\OneDrive - AS Infragate Eesti\Endaprojektid\Excel REST API\AutoCAD\Infrakit\obj\Debug\Infrakit_MarkupCompile.cache
+C:\Users\raimo\OneDrive - AS Infragate Eesti\Endaprojektid\Excel REST API\AutoCAD\Infrakit\obj\Debug\Infrakit_MarkupCompile.lref
+C:\Users\raimo\OneDrive - AS Infragate Eesti\Endaprojektid\Excel REST API\AutoCAD\Infrakit\obj\Debug\Infrakit.g.resources
+C:\Users\raimo\OneDrive - AS Infragate Eesti\Endaprojektid\Excel REST API\AutoCAD\Infrakit\obj\Debug\Infrakit.csproj.CoreCompileInputs.cache
+C:\Users\raimo\OneDrive - AS Infragate Eesti\Endaprojektid\Excel REST API\AutoCAD\Infrakit\obj\Debug\Infrakit.csproj.CopyComplete
+C:\Users\raimo\OneDrive - AS Infragate Eesti\Endaprojektid\Excel REST API\AutoCAD\Infrakit\obj\Debug\Infrakit.dll
+C:\Users\raimo\OneDrive - AS Infragate Eesti\Endaprojektid\Excel REST API\AutoCAD\Infrakit\obj\Debug\Infrakit.pdb
+C:\Users\raimo\OneDrive - AS Infragate Eesti\Endaprojektid\Excel REST API\AutoCAD\Infrakit\obj\Debug\Windows\Infrakit.g.cs
+C:\Users\raimo\OneDrive - AS Infragate Eesti\Endaprojektid\Excel REST API\AutoCAD\Infrakit\obj\Debug\Windows\Infrakit.baml
+C:\Users\Raimo\OneDrive - AS Infragate Eesti\Endaprojektid\Excel REST API\AutoCAD\Infrakit\bin\Debug\Newtonsoft.Json.xml
+C:\Users\Raimo\OneDrive - AS Infragate Eesti\Endaprojektid\Excel REST API\AutoCAD\Infrakit\bin\Debug\Newtonsoft.Json.dll
+C:\Users\Raimo\OneDrive - AS Infragate Eesti\Endaprojektid\Excel REST API\AutoCAD\Infrakit\obj\Debug\Infrakit.csproj.AssemblyReference.cache

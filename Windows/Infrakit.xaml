@@ -5,9 +5,9 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:Infrakit.Windows"
              mc:Ignorable="d" 
-             Title="Infrakit settings v.0.20" 
-             Height="805" 
-             Width="650"
+             Title="Infrakit settings v.1.0" 
+             Height="555" 
+             Width="520"
              ResizeMode="NoResize" 
              WindowStartupLocation="CenterOwner"
              Icon="/Infrakit;component/Windows/Infrakit.ico">
@@ -18,37 +18,34 @@
 
         </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="32"/>
+            <RowDefinition Height="522"/>
         </Grid.RowDefinitions>
 
-        <Grid x:Name="LogiSisse" Margin="4,4,3.667,0.333">
+        <Grid x:Name="LogiSisse" Margin="5,8,10,6" Width="505" Height="510">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="29.667" />
-                <ColumnDefinition Width="45.667"/>
-                <ColumnDefinition MinWidth="100" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
             <Grid.RowDefinitions>
-                <RowDefinition Height="30" />
-                <RowDefinition Height="36*"/>
-                <RowDefinition Height="671*"/>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
             </Grid.RowDefinitions>
-            <TextBlock VerticalAlignment="Center" Text="Username" Grid.ColumnSpan="3" Margin="0,7,559.667,7" />
-            <TextBox x:Name="Kasutajanimi" Grid.Column="2" HorizontalAlignment="Left" Margin="4.666,7,0,6" TextWrapping="Wrap" Width="225" TextChanged="Kasutajanimi_TextChanged"/>
-            <TextBlock VerticalAlignment="Center" Text="Password" Grid.ColumnSpan="3" Margin="0,0,209.667,20" Grid.Row="1" />
+            <TextBlock VerticalAlignment="Center" Text="Username" Grid.ColumnSpan="2" Margin="4,7,7,7" Height="18" Width="55" />
+            <TextBox x:Name="Kasutajanimi" Grid.Column="2" HorizontalAlignment="Right" Margin="0,7,164,7" TextWrapping="Wrap" Width="270" TextChanged="Kasutajanimi_TextChanged" Height="18"/>
+            <TextBlock Text="Password" Grid.ColumnSpan="2" Margin="4,0,7,0" Grid.Row="1" Width="55" Height="18" VerticalAlignment="Top" />
             <TextBox x:Name="Parool" Grid.Column="2" HorizontalAlignment="Left" Height="16" Margin="4.666,1,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="225" TextChanged="Parool_TextChanged" Grid.Row="1" Visibility="Collapsed"  />
-            <PasswordBox x:Name="ParoolPasswordBox" Grid.Column="2" HorizontalAlignment="Left" Height="16" Margin="4.666,1,0,0" Grid.Row="1" VerticalAlignment="Top" Width="225" PasswordChanged="ParoolPasswordBox_PasswordChanged"/>
-            <CheckBox x:Name="ShowPasswordCheckBox" Content="Show Password" Checked="ShowPasswordCheckBox_Checked" Unchecked="ShowPasswordCheckBox_Unchecked" Grid.Column="2" Margin="238.666,29,181.667,20" Grid.RowSpan="2" />
-            <Button x:Name="BtnNameLogiSisse" Content="Login" HorizontalAlignment="Left" Height="25" Margin="1,21,0,0" VerticalAlignment="Top" Width="75" Click="BtnLogiSisse" ToolTip="Projects are received from the server." IsDefault="True" Grid.Row="1" Grid.RowSpan="2" Grid.ColumnSpan="3"/>
+            <PasswordBox x:Name="ParoolPasswordBox" Grid.Column="2" HorizontalAlignment="Left" Height="18" Margin="5,0,0,0" Grid.Row="1" VerticalAlignment="Top" Width="224" PasswordChanged="ParoolPasswordBox_PasswordChanged"/>
+            <CheckBox x:Name="ShowPasswordCheckBox" Content="Show Password" Checked="ShowPasswordCheckBox_Checked" Unchecked="ShowPasswordCheckBox_Unchecked" Grid.Column="2" Margin="240.333,2,90.667,20" Height="15" Grid.Row="1" Width="110" />
+            <Button x:Name="BtnNameLogiSisse" Content="Login" HorizontalAlignment="Left" Margin="360,30,0,18" Width="62" Click="BtnLogiSisse" ToolTip="Projects are received from the server." IsDefault="True" Grid.Column="2" Grid.RowSpan="2"/>
 
-            <Button x:Name="BtnNameSalvestaSisselogimineAndmed" Content="Save login information" HorizontalAlignment="Left" Height="18" Margin="238.666,6,0,0" VerticalAlignment="Top" Width="141" Click="BtnSalvestaSisselogimineAndmed" Grid.Column="2" ToolTip="Login information is saved to computer registry in encrypted form."/>
-            <TextBlock Text="Projects" Margin="2,15,0,634" Grid.Row="2" Grid.ColumnSpan="2" />
-            <ComboBox x:Name="Projektid" HorizontalAlignment="Left" Height="25" Margin="4.666,15,0,0" VerticalAlignment="Top" Width="455" SelectionChanged="Projektid_SelectionChanged" Grid.Row="2" Grid.Column="2"/>
+            <Button x:Name="BtnNameSalvestaSisselogimineAndmed" Content="Save login information" HorizontalAlignment="Left" Height="20" Margin="289,7,0,0" VerticalAlignment="Top" Width="133" Click="BtnSalvestaSisselogimineAndmed" Grid.Column="2" ToolTip="Login information is saved to computer registry in encrypted form."/>
+            <ComboBox x:Name="Projektid" HorizontalAlignment="Left" Height="20" Margin="5,24,0,0" VerticalAlignment="Top" Width="418" SelectionChanged="Projektid_SelectionChanged" Grid.Row="1" Grid.Column="2" Grid.RowSpan="2"/>
 
-            <TextBlock Text="Surfaces folder" Grid.ColumnSpan="3" Margin="10,53,375,594" Grid.Row="2" Width="250" Height="25" />
-            <ComboBox x:Name="PindadeKaustad" Grid.ColumnSpan="3" HorizontalAlignment="Left" Height="25" Margin="10,85,0,0" VerticalAlignment="Top" Width="255" SelectionChanged="PindadeKaustad_SelectionChanged" Grid.Row="2"/>
-            <!--<ListBox x:Name="Pinnad" HorizontalAlignment="Left" Height="134" Margin="13,531,0,0" VerticalAlignment="Top" Width="252" SelectionMode="Extended" SelectionChanged="Pinnad_SelectionChanged" Grid.ColumnSpan="3" Grid.Row="2"/>-->
-            <TreeView x:Name="SurfaceTreeView" Grid.ColumnSpan="3" Margin="13,166,375,326.333" Grid.Row="2">
+            <TextBlock Text="Surfaces folder" Grid.ColumnSpan="3" Margin="4,15,247,400" Grid.Row="2" />
+            <ComboBox x:Name="PindadeKaustad" Grid.ColumnSpan="3" HorizontalAlignment="Left" Height="20" Margin="4,39,0,0" VerticalAlignment="Top" Width="235" SelectionChanged="PindadeKaustad_SelectionChanged" Grid.Row="2"/>
+            <TreeView x:Name="SurfaceTreeView" Grid.ColumnSpan="3" Margin="4,125,266,131" Grid.Row="2" Height="185">
                 <TreeView.ItemContainerStyle>
                     <Style TargetType="TreeViewItem">
                         <Setter Property="Template">
@@ -65,14 +62,13 @@
                     </Style>
                 </TreeView.ItemContainerStyle>
             </TreeView>
-            <TextBox x:Name="OtsiPinnad" Grid.ColumnSpan="3" HorizontalAlignment="Left" Height="17" Margin="12,144,0,0" Grid.Row="2" TextWrapping="Wrap" VerticalAlignment="Top" Width="250" TextChanged="OtsiPinnad_TextChanged"/>
-            <Button x:Name="BtnValiPinnad" Content="Select surfaces" HorizontalAlignment="Left" Height="24" Margin="12,115,0,0" Grid.Row="2" VerticalAlignment="Top" Width="86" Click="ValiPinnad_Click" ToolTip="Select surfaces from drawing" RenderTransformOrigin="-9.29,0.23" Grid.ColumnSpan="3"/>
-            <CheckBox x:Name="ValitudPinnadNähtavad" Content="Hide unselected" Grid.Column="2" HorizontalAlignment="Left" Height="18" Margin="37.666,121,0,0" Grid.Row="2" VerticalAlignment="Top" Width="122" Checked="ValitudPinnadNähtavad_Checked" Unchecked="ValitudPinnadNähtavad_Unchecked" RenderTransformOrigin="-7.929,-1.963"/>
+            <TextBox x:Name="OtsiPinnad" Grid.ColumnSpan="3" HorizontalAlignment="Left" Height="20" Margin="4,99,0,0" Grid.Row="2" TextWrapping="Wrap" VerticalAlignment="Top" Width="235" TextChanged="OtsiPinnad_TextChanged"/>
+            <Button x:Name="BtnValiPinnad" Content="Select surfaces" HorizontalAlignment="Left" Height="25" Margin="4,70,0,0" Grid.Row="2" VerticalAlignment="Top" Width="115" Click="ValiPinnad_Click" ToolTip="Select surfaces from drawing" RenderTransformOrigin="-9.29,0.23" Grid.ColumnSpan="3"/>
+            <CheckBox x:Name="ValitudPinnadNähtavad" Content="Hide unselected" Grid.Column="2" HorizontalAlignment="Left" Height="20" Margin="65,75,0,0" Grid.Row="2" VerticalAlignment="Top" Width="115" Checked="ValitudPinnadNähtavad_Checked" Unchecked="ValitudPinnadNähtavad_Unchecked" RenderTransformOrigin="-7.929,-1.963"/>
 
-            <TextBlock Text="Alignments folder" Margin="205,53,100,594" Grid.Column="2" Grid.Row="2" Width="250" Height="25" />
-            <ComboBox x:Name="TelgedeKaustad" HorizontalAlignment="Left" Height="25" Margin="204.666,85,0,0" VerticalAlignment="Top" Width="255" SelectionChanged="TelgedeKaustad_SelectionChanged" Grid.Row="2" Grid.Column="2"/>
-            <!--<ListBox x:Name="Teljed" HorizontalAlignment="Left" Height="182" Margin="209.667,166,0,0" VerticalAlignment="Top" Width="255" SelectionMode="Extended" SelectionChanged="Teljed_SelectionChanged" Grid.Column="1" Grid.Row="2"/>-->
-            <TreeView x:Name="AlignmentTreeView" Margin="204.666,166,101.667,326.333" Grid.Row="2" Grid.Column="2">
+            <TextBlock Text="Alignments folder" Margin="0,15,-3,401" Grid.Column="2" Grid.Row="2" Height="25" HorizontalAlignment="Right" Width="254" />
+            <ComboBox x:Name="TelgedeKaustad" HorizontalAlignment="Left" Height="20" Margin="187,39,0,0" VerticalAlignment="Top" Width="235" SelectionChanged="TelgedeKaustad_SelectionChanged" Grid.Row="2" Grid.Column="2"/>
+            <TreeView x:Name="AlignmentTreeView" Margin="188,126,17,130" Grid.Row="2" Grid.Column="2" Height="185">
                 <TreeView.ItemTemplate>
                     <HierarchicalDataTemplate ItemsSource="{Binding Profiles}">
                         <CheckBox Content="{Binding Name}" IsChecked="{Binding IsSelected, Mode=TwoWay}" Checked="AlignmentCheckBox_Checked" Unchecked="AlignmentCheckBox_Unchecked"/>
@@ -85,31 +81,26 @@
                     </HierarchicalDataTemplate>
                 </TreeView.ItemTemplate>
             </TreeView>
-            <!--<TextBox x:Name="OtsiTeljed" HorizontalAlignment="Left" Height="17" Margin="205,144,0,0" Grid.Row="2" TextWrapping="Wrap" VerticalAlignment="Top" Width="250" TextChanged="OtsiTeljed_TextChanged" Grid.Column="2"/>-->
-            <Button x:Name="BtnValiTeljed" Content="Select alignments" Grid.Column="2" HorizontalAlignment="Left" Height="24" Margin="205,115,0,0" Grid.Row="2" VerticalAlignment="Top" Width="104" Click="ValiTeljed_Click" ToolTip="Select alignments from drawing" />
-            <CheckBox x:Name="ValitudTeljedNähtavad" Content="Hide unselected" Grid.Column="2" HorizontalAlignment="Left" Height="18" Margin="314,120,0,0" Grid.Row="2" VerticalAlignment="Top" Width="109" Checked="ValitudTeljedNähtavad_Checked" Unchecked="ValitudTeljedNähtavad_Unchecked" RenderTransformOrigin="19.905,0.148"/>
+            <TextBox x:Name="OtsiTeljed" HorizontalAlignment="Left" Height="20" Margin="188,100,0,0" Grid.Row="2" TextWrapping="Wrap" VerticalAlignment="Top" Width="235" TextChanged="OtsiTeljed_TextChanged" Grid.Column="2"/>
+            <Button x:Name="BtnValiTeljed" Content="Select alignments" Grid.Column="2" HorizontalAlignment="Right" Height="25" Margin="0,70,132,0" Grid.Row="2" VerticalAlignment="Top" Width="119" Click="ValiTeljed_Click" ToolTip="Select alignments from drawing" />
+            <CheckBox x:Name="ValitudTeljedNähtavad" Content="Hide unselected" Grid.Column="2" HorizontalAlignment="Left" Height="20" Margin="315,75,0,0" Grid.Row="2" VerticalAlignment="Top" Width="115" Checked="ValitudTeljedNähtavad_Checked" Unchecked="ValitudTeljedNähtavad_Unchecked" RenderTransformOrigin="19.905,0.148"/>
 
-            <TextBlock Text="Folder to save surfaces" Grid.ColumnSpan="3" Margin="10,355,458,294" Grid.Row="2" Height="25" Width="170" />
-            <Button x:Name="BtnNameValiPinnadKaust" Content="Browse folder" HorizontalAlignment="Left" Height="20" Margin="106.666,360,0,0" VerticalAlignment="Top" Width="80" Click="BtnValiPinnadKaust" ToolTip="Button to select a folder" Grid.Row="2" Grid.Column="2"/>
-            <TextBox x:Name="PinnaKaust" HorizontalAlignment="Left" Height="75" Margin="12,383,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="250" TextChanged="PinnaKaust_TextChanged" ToolTip="Folder where surface xml are saved. When empty then to DWG folder." Grid.Row="2" Grid.ColumnSpan="3"/>
-            <Button x:Name="BtnNameLaePinnadUlesse" Content="Upload surfaces" Height="25" Margin="12,463,507.667,0" VerticalAlignment="Top" Click="BtnLaePinnadUlesse" ToolTip="Surfaces xml files are saved to surfaces folder and uploaded to selected project folder." Grid.Row="2" Grid.ColumnSpan="3"/>
-            <Button x:Name="BtnNameLaePinnadUlesseUus" Content="Upload surfaces new" Height="25" Margin="12,493,485.666,0" VerticalAlignment="Top" Click="BtnLaePinnadUlesseUus" ToolTip="Surfaces xml files are saved to surfaces folder and uploaded to selected project folder." Grid.Row="2" Grid.ColumnSpan="3"/>
+            <TextBlock Text="Folder to save surfaces" Grid.ColumnSpan="3" Margin="4,316,361,99" Grid.Row="2" />
+            <Button x:Name="BtnNameValiPinnadKaust" Content="Browse folder" HorizontalAlignment="Left" Height="20" Margin="78,315,0,0" VerticalAlignment="Top" Width="95" Click="BtnValiPinnadKaust" ToolTip="Button to select a folder" Grid.Row="2" Grid.Column="2"/>
+            <TextBox x:Name="PinnaKaust" HorizontalAlignment="Left" Height="20" Margin="4,340,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="235" TextChanged="PinnaKaust_TextChanged" ToolTip="Folder where surface xml are saved. When empty then to DWG folder." Grid.Row="2" Grid.ColumnSpan="3"/>
+            <Button x:Name="BtnNameLaePinnadUlesseUus" Content="Upload surfaces" Height="25" Margin="4,370.333,390.667,0" VerticalAlignment="Top" Click="BtnLaePinnadUlesseUus" ToolTip="Surfaces xml files are saved to surfaces folder and uploaded to selected project folder." Grid.Row="2" Grid.ColumnSpan="3" Width="105"/>
 
-            <TextBlock Text="Folder to save aligmnets" Margin="0,355,185,294" Grid.Column="2" Grid.Row="2" Height="25" HorizontalAlignment="Right" Width="170" />
-            <Button x:Name="BtnNameValiTeljeKaust" Content="Browse folder" Grid.Column="2" HorizontalAlignment="Left" Height="21" Margin="379.666,359,0,0" VerticalAlignment="Top" Width="80" Click="BtnValiTeljeKaust" ToolTip="Button to select a folder" Grid.Row="2"/>
-            <TextBox x:Name="TeljeKaust" HorizontalAlignment="Left" Height="75" Margin="204.666,383,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="255" TextChanged="TeljeKaust_TextChanged" ToolTip="Folder where surface xml are saved. When empty then to DWG folder." Grid.Column="2" Grid.Row="2"/>
-            <Button x:Name="BtnNameLaeTeljedUlesse" Content="Upload alignments" Height="25" Margin="0,463,100.666,0" VerticalAlignment="Top" Click="BtnLaeTeljedUlesse" ToolTip="Alingments xml files are saved to alignments folder and uploaded to selected project folder." Grid.Row="2" Grid.Column="2" HorizontalAlignment="Right" Width="116"/>
-            <Button x:Name="BtnNameLaeTeljedUlesseUus" Content="Upload alignments new" Height="25" Margin="344,493,60.666,0" VerticalAlignment="Top" Click="BtnLaeTeljedUlesseUus" ToolTip="Alingments xml files are saved to alignments folder and uploaded to selected project folder." Grid.Row="2" Grid.Column="2"/>
-
-            <Button x:Name="BtnNameLaeUlesse" Content="Upload" Height="25" Margin="129,522,315.666,0" VerticalAlignment="Top" Click="BtnLaeUlesse" ToolTip="Surface and alingments xml files are saved to folders and uploaded to selected project folders." Grid.Row="2" RenderTransformOrigin="0.457,4.24" Grid.Column="2"/>
-            <Button x:Name="BtnNameLaeUlesseUus" Content="Upload new" Height="25" Margin="129,552,221.666,0" VerticalAlignment="Top" Click="BtnLaeUlesseUus" ToolTip="Surface and alingments xml files are saved to folders and uploaded to selected project folders." Grid.Row="2" RenderTransformOrigin="0.457,4.24" Grid.Column="2"/>
-
-
+            <TextBlock Text="Folder to save aligmnets" Margin="188,314,108,99" Grid.Column="2" Grid.Row="2" />
+            <Button x:Name="BtnNameValiTeljeKaust" Content="Browse folder" Grid.Column="2" HorizontalAlignment="Left" Height="20" Margin="327,315,0,0" VerticalAlignment="Top" Width="95" Click="BtnValiTeljeKaust" ToolTip="Button to select a folder" Grid.Row="2" RenderTransformOrigin="0.229,0.063"/>
+            <TextBox x:Name="TeljeKaust" HorizontalAlignment="Left" Height="20" Margin="187,340,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="235" TextChanged="TeljeKaust_TextChanged" ToolTip="Folder where surface xml are saved. When empty then to DWG folder." Grid.Column="2" Grid.Row="2"/>
+            <Button x:Name="BtnNameLaeTeljedUlesseUus" Content="Upload alignments" Height="25" Margin="307,370,17,0" VerticalAlignment="Top" Click="BtnLaeTeljedUlesseUus" ToolTip="Alingments xml files are saved to alignments folder and uploaded to selected project folder." Grid.Row="2" Grid.Column="2" RenderTransformOrigin="0.854,0.467"/>
+            <Button x:Name="BtnNameLaeUlesseUus" Content="Upload all" Height="25" Margin="130,370,204,0" VerticalAlignment="Top" Click="BtnLaeUlesseUus" ToolTip="Surface and alingments xml files are saved to folders and uploaded to selected project folders." Grid.Row="2" RenderTransformOrigin="0.457,4.24" Grid.Column="2"/>
+            <TextBlock Text="Projects" Grid.ColumnSpan="2" Margin="4,26,4.541,0" Grid.Row="1" Width="55" Height="18" VerticalAlignment="Top" Grid.RowSpan="2" />
 
         </Grid>
-        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Grid.Row="1" Grid.Column="2" Margin="0,0,-0.333,0">
-            <Button Width="76" Content="Ok" IsDefault="True" Name="btnOk" Margin="4" Click="btnOk_Click" />
-            <Button Width="76" Content="Cancel" IsCancel="False" Name="btnCancel" Margin="4" Click="btnCancel_Click" />
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,475,15,10" Width="168">
+            <Button Width="75" Content="Ok" IsDefault="True" x:Name="btnOk" Margin="4" Click="btnOk_Click" Height="25" />
+            <Button Width="75" Content="Cancel" IsCancel="False" x:Name="btnCancel" Margin="4" Click="btnCancel_Click" Height="25" />
         </StackPanel>
     </Grid>
 </Window>

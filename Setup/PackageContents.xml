@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ApplicationPackage 
+  SchemaVersion="1.0"
+  AutodeskProduct="AutoCAD"
+  ProductType="Application"
+  AppVersion="1.0"
+  Author="Raimo Lust"
+  Name="Infrakit"
+  Description="Upload xml files to Infrakit"                   
+  ProductCode="[015500f3-9201-4b7f-b00a-5c492cf96620]"
+>
+  <RuntimeRequirements OS="Win32|Win64" Platform="AutoCAD*" SeriesMin="R18.2" SeriesMax="R27.1" SupportPath=".\Contents\"/>  
+  <Components>    
+    <ComponentEntry AppName="Grid Line" ModuleName="./Contents/Infrakit.dll" LoadOnAutoCADStartup="True"/>
+	<ComponentEntry AppName="Infrakit" ModuleName="./Contents/Infrakit.cuix" AppDescription="Infrakit" AppType="CuiX"/>
+  </Components>  
+</ApplicationPackage>

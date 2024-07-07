@@ -27,10 +27,6 @@ using System.Xml;
 namespace Infrakit.Windows
 {
 
-    public class SurfaceModel
-    {
-        public string Name { get; set; }
-    }
 
     public class ListViewItemModel : INotifyPropertyChanged
     {
@@ -90,26 +86,20 @@ namespace Infrakit.Windows
         }
     }
 
-    public class ProfileData
-    {
-        public string Name { get; set; }
-        public bool IsSelected { get; set; }
-    }
-
     public class SelectedAlignmentProfile
     {
         public string AlignmentName { get; set; }
-        public List<string> ProfileNames { get; set; } // List to store profile names for the alignment
+        public List<ProfileModel> ProfileNames { get; set; } // List to store profile models for the alignment
         public bool IsAlignmentSelected { get; set; } // Indicates if the alignment is selected
         public bool IsProfileSelected { get; set; } // Indicates if any profile is selected
 
         public SelectedAlignmentProfile()
         {
-            ProfileNames = new List<string>();
+            ProfileNames = new List<ProfileModel>();
             IsAlignmentSelected = false;
-            IsProfileSelected = false;
         }
     }
+
 
 
     public partial class Infrakit : Window
@@ -123,26 +113,21 @@ namespace Infrakit.Windows
         private Dictionary<string, string> AlignmentFolderNameUUidPairs;
         private Dictionary<string, string> ProjectNameUUidPairs;
         private List<string> allSurfaceNames; // Store all surface names during initialization
-        //private List<string> allAlignmentNames;
-        //private Dictionary<string, List<string>> allAlignmentData = new Dictionary<string, List<string>>();
         private Dictionary<string, SelectedAlignmentProfile> allAlignmentData = new Dictionary<string, SelectedAlignmentProfile>();
 
 
         private List<string> SelectedPinnad;
-        //private List<string> SelectedTeljed;
         public ObservableCollection<ListViewItemModel> AlignmentItems { get; set; }
 
 
         public ObservableCollection<ListViewItemModel> SurfaceItems { get; set; } = new ObservableCollection<ListViewItemModel>();
         string Year = Commands.year;
 
-
-
-
         [CommandMethod("Upload")]
         public void Upload()
         {
             Document doc = AcAp.DocumentManager.MdiActiveDocument;
+            Editor ed = doc.Editor;
             Database db = doc.Database;
             CivilDocument civDoc = CivilApplication.ActiveDocument;
             Stopwatch stopwatch = Stopwatch.StartNew();  // Start the stopwatch
@@ -150,104 +135,18 @@ namespace Infrakit.Windows
             try
             {
                 if (string.IsNullOrEmpty(Projektid.Text) || string.IsNullOrEmpty(PindadeKaustad.Text) || string.IsNullOrEmpty(TelgedeKaustad.Text))
-                {
-                    if (string.IsNullOrEmpty(Projektid.Text))
-                    {
-                        MessageBox.Show("Project is empty!", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                    }
-                    if (string.IsNullOrEmpty(PindadeKaustad.Text))
-                    {
-                        MessageBox.Show("Surface folder is empty!", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                    }
-                    if (string.IsNullOrEmpty(TelgedeKaustad.Text))
-                    {
-                        MessageBox.Show("Alignment folder is empty!", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                    }
+                {                    
+                    ShowErrorForEmptyFields("Upload");
                 }
                 else
                 {
-                    foreach (ListViewItemModel surfaceItem in SurfaceItems)
-                    {
-                        if (surfaceItem.IsSelected)
-                        {
-                            accessToken = GetAccessToken();
-
-                            // Find the surface with the given name
-                            ObjectId surfaceId = ObjectId.Null;
-                            using (Transaction tr = db.TransactionManager.StartTransaction())
-                            {
-                                TinSurface surface = tr.GetObject(GetSurfaceIdByName(civDoc, surfaceItem.Name), OpenMode.ForRead) as TinSurface;
-                                if (surface != null)
-                                {
-                                    surfaceId = surface.Id;
-                                }
-                                tr.Commit();
-                            }
-
-                            using (Transaction tr = db.TransactionManager.StartTransaction())
-                            {
-                                TinSurface surface = tr.GetObject(surfaceId, OpenMode.ForRead) as TinSurface;
-
-                                if (surface == null)
-                                {
-                                    AcAp.DocumentManager.MdiActiveDocument.Editor.WriteMessage("Failed to open surface!");
-                                    return;
-                                }
-                                string filePath = CreateAndSaveSurfaceLandXMLToFile(surface, surfaceItem.Name);
-                                if (filePath != null)
-                                {
-                                    UploadFile(filePath, surfaceItem.Name, SurfaceFolderNameUUidPairs[PindadeKaustad.SelectedValue.ToString()]);
-                                }
-                                tr.Commit();
-                            }
-                        }
-                    }
-
-                    foreach (ListViewItemModel alignmentItem in AlignmentItems)
-                    {
-                        if (alignmentItem.IsSelected)
-                        {
-                            accessToken = GetAccessToken();
-                            // Find the alignment with the given name
-                            ObjectId alignmentId = ObjectId.Null;
-                            using (Transaction tr = db.TransactionManager.StartTransaction())
-                            {
-                                Alignment alignment = tr.GetObject(GetAlignmentIdByName(civDoc, alignmentItem.Name), OpenMode.ForRead) as Alignment;
-                                if (alignment != null)
-                                {
-                                    alignmentId = alignment.Id;
-                                }
-                                tr.Commit();
-                            }
-
-                            using (Transaction tr = db.TransactionManager.StartTransaction())
-                            {
-                                Alignment alignment = tr.GetObject(alignmentId, OpenMode.ForRead) as Alignment;
-
-                                if (alignment == null)
-                                {
-                                    AcAp.DocumentManager.MdiActiveDocument.Editor.WriteMessage("Failed to open alignment!");
-                                    return;
-                                }
-                                ProfileModel selectedProfile = alignmentItem.Profiles.FirstOrDefault(p => p.IsSubItemSelected);    // Assuming there's only one profile selected for each alignment                           
-                                string profileName = selectedProfile == null ? "" : selectedProfile.Name;
-                                string filePath = CreateAndSaveAlignmentLandXMLToFile(alignment, alignment.Name, profileName);
-
-                                if (filePath != null)
-                                {
-                                    UploadFile(filePath, alignment.Name, AlignmentFolderNameUUidPairs[TelgedeKaustad.SelectedValue.ToString()]);
-                                }
-                                tr.Commit();
-                            }
-                        }
-                    }
-
-
+                    string exportFilePath = System.IO.Path.GetDirectoryName(db.Filename) + "\\AutomaticLandXML.xml";                  
+                    ExecuteLandXmlOutCommand(ed, exportFilePath);
+                    ProcessSurfaces(exportFilePath, db);
+                    ProcessAlignments(exportFilePath, db);
                     elapsedTime = stopwatch.Elapsed;  // Get the elapsed time as a TimeSpan                 
                     MessageBox.Show($"Upload complete. It took {elapsedTime.ToString(@"mm\:ss")} to complete.");
                 }
-
-
             }
             catch (WebException webEx)
             {
@@ -262,10 +161,8 @@ namespace Infrakit.Windows
                 MessageBox.Show("Exception: " + ex.Message);
             }
         }
-
-        [CommandMethod("UploadNew")]
-        //public async void UploadNew()
-        public void UploadNew()
+        [CommandMethod("UploadSurfaces")]
+        public void UploadSurfaces()
         {
             Document doc = AcAp.DocumentManager.MdiActiveDocument;
             Editor ed = doc.Editor;
@@ -277,89 +174,53 @@ namespace Infrakit.Windows
             {
                 if (string.IsNullOrEmpty(Projektid.Text) || string.IsNullOrEmpty(PindadeKaustad.Text) || string.IsNullOrEmpty(TelgedeKaustad.Text))
                 {
-                    if (string.IsNullOrEmpty(Projektid.Text))
-                    {
-                        MessageBox.Show("Project is empty!", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                    }
-                    if (string.IsNullOrEmpty(PindadeKaustad.Text))
-                    {
-                        MessageBox.Show("Surface folder is empty!", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                    }
-                    if (string.IsNullOrEmpty(TelgedeKaustad.Text))
-                    {
-                        MessageBox.Show("Alignment folder is empty!", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                    }
+                    ShowErrorForEmptyFields("SurfaceUpload");
                 }
                 else
                 {
-
-                    //await ed.CommandAsync("-LANDXMLOUT", "1.2", "AutomaticLandXML.xml");
-                    ed.Command("-LANDXMLOUT", "1.2", "AutomaticLandXML.xml");
                     string exportFilePath = System.IO.Path.GetDirectoryName(db.Filename) + "\\AutomaticLandXML.xml";
-                    List<string> surfacesToKeep = new List<string>();
-                    foreach (ListViewItemModel surfaceItem in SurfaceItems)
-                    {
-                        if (surfaceItem.IsSelected)
-                        {
-                            surfacesToKeep.Add(surfaceItem.Name);
-
-                        }
-                    }
-                    SplitLandXMLSurfaces(exportFilePath, surfacesToKeep);
-                    foreach (ListViewItemModel surfaceItem in SurfaceItems)
-                    {
-                        if (surfaceItem.IsSelected)
-                        {
-                            string filePath = System.IO.Path.GetDirectoryName(db.Filename) + "\\" + surfaceItem.Name + ".xml";
-                            if (PinnaKaust.Text != "")
-                            {
-                                filePath = PinnaKaust.Text + "\\" + surfaceItem.Name + ".xml";
-                            }
-
-
-                            accessToken = GetAccessToken();
-                            UploadFile(filePath, surfaceItem.Name, SurfaceFolderNameUUidPairs[PindadeKaustad.SelectedValue.ToString()]);
-                        }
-                    }
-
-                    List<string> alignmentsToKeep = new List<string>();
-                    List<string> profilesToKeep = new List<string>();
-
-                    foreach (ListViewItemModel alignmentItem in AlignmentItems)
-                    {
-                        if (alignmentItem.IsSelected)
-                        {
-                            ProfileModel selectedProfile = alignmentItem.Profiles.FirstOrDefault(p => p.IsSubItemSelected);    // Assuming there's only one profile selected for each alignment                           
-                            string profileName = selectedProfile == null ? "" : selectedProfile.Name;
-                            alignmentsToKeep.Add(alignmentItem.Name);
-                            profilesToKeep.Add(selectedProfile == null ? "" : selectedProfile.Name);
-                        }
-                    }
-
-                    SplitLandXMLAlignments(exportFilePath, alignmentsToKeep, profilesToKeep);
-
-                    foreach (ListViewItemModel alignmentItem in AlignmentItems)
-                    {
-                        if (alignmentItem.IsSelected)
-                        {
-                            ProfileModel selectedProfile = alignmentItem.Profiles.FirstOrDefault(p => p.IsSubItemSelected);    // Assuming there's only one profile selected for each alignment                           
-                            string profileName = selectedProfile == null ? "" : selectedProfile.Name;
-                            string filePath = System.IO.Path.GetDirectoryName(db.Filename) + "\\" + alignmentItem.Name + ".xml";
-                            if (TeljeKaust.Text != "")
-                            {
-                                filePath = TeljeKaust.Text + "\\" + alignmentItem.Name + ".xml";
-                            }
-
-                            accessToken = GetAccessToken();
-                            UploadFile(filePath, alignmentItem.Name, AlignmentFolderNameUUidPairs[TelgedeKaustad.SelectedValue.ToString()]);
-                        }
-                    }
-
+                    ExecuteLandXmlOutCommand(ed, exportFilePath);
+                    ProcessSurfaces(exportFilePath, db);
                     elapsedTime = stopwatch.Elapsed;  // Get the elapsed time as a TimeSpan                 
                     MessageBox.Show($"Upload complete. It took {elapsedTime.ToString(@"mm\:ss")} to complete.");
                 }
-
-
+            }
+            catch (WebException webEx)
+            {
+                HandleWebException(webEx);
+            }
+            catch (Autodesk.AutoCAD.Runtime.Exception ex)
+            {
+                MessageBox.Show("Exception: " + ex.Message);
+            }
+            catch (System.Exception ex)
+            {
+                MessageBox.Show("Exception: " + ex.Message);
+            }
+        }
+        [CommandMethod("UploadAlignments")]
+        public void UploadAlignments()
+        {
+            Document doc = AcAp.DocumentManager.MdiActiveDocument;
+            Editor ed = doc.Editor;
+            Database db = doc.Database;
+            CivilDocument civDoc = CivilApplication.ActiveDocument;
+            Stopwatch stopwatch = Stopwatch.StartNew();  // Start the stopwatch
+            TimeSpan elapsedTime;
+            try
+            {
+                if (string.IsNullOrEmpty(Projektid.Text) || string.IsNullOrEmpty(PindadeKaustad.Text) || string.IsNullOrEmpty(TelgedeKaustad.Text))
+                {
+                    ShowErrorForEmptyFields("AlignmentUpload");
+                }
+                else
+                {
+                    string exportFilePath = System.IO.Path.GetDirectoryName(db.Filename) + "\\AutomaticLandXML.xml";
+                    ExecuteLandXmlOutCommand(ed, exportFilePath);                    
+                    ProcessAlignments(exportFilePath, db);
+                    elapsedTime = stopwatch.Elapsed;  // Get the elapsed time as a TimeSpan                 
+                    MessageBox.Show($"Upload complete. It took {elapsedTime.ToString(@"mm\:ss")} to complete.");
+                }
             }
             catch (WebException webEx)
             {
@@ -382,16 +243,10 @@ namespace Infrakit.Windows
                 InitializeComponent();
                 Document doc = AcAp.DocumentManager.MdiActiveDocument;
                 Database db = doc.Database;
-
                 allSurfaceNames = new List<string>();
                 SelectedPinnad = new List<string>();
-
-
                 AddSurfaces();
                 SurfaceTreeView.ItemsSource = SurfaceItems;
-
-
-
                 //allAlignmentNames = new List<string>();
                 AlignmentItems = new ObservableCollection<ListViewItemModel>();
                 //SelectedTeljed = new List<string>();
@@ -509,97 +364,6 @@ namespace Infrakit.Windows
             }
         }
 
-
-        //private void AddAlignmentAndProfiles()
-        //{
-        //    using (var db = HostApplicationServices.WorkingDatabase)
-        //    {
-        //        using (Transaction tr = db.TransactionManager.StartTransaction())
-        //        {
-        //            BlockTable bt = tr.GetObject(db.BlockTableId, OpenMode.ForRead) as BlockTable;
-        //            BlockTableRecord btr = tr.GetObject(bt[BlockTableRecord.ModelSpace], OpenMode.ForRead) as BlockTableRecord;
-
-        //            foreach (ObjectId entId in btr)
-        //            {
-        //                if (entId.ObjectClass.IsDerivedFrom(RXObject.GetClass(typeof(Alignment))))
-        //                {
-        //                    Alignment alignment = tr.GetObject(entId, OpenMode.ForRead) as Alignment;
-        //                    if (alignment != null)
-        //                    {
-        //                        var alignmentItem = new ListViewItemModel
-        //                        {
-        //                            Name = alignment.Name,
-        //                            Profiles = new ObservableCollection<ProfileModel>()
-        //                        };
-
-        //                        ObjectIdCollection profileIds = alignment.GetProfileIds();
-        //                        foreach (ObjectId profileId in profileIds)
-        //                        {
-        //                            Autodesk.Civil.DatabaseServices.Profile profile = tr.GetObject(profileId, OpenMode.ForRead) as Autodesk.Civil.DatabaseServices.Profile;
-        //                            if (profile != null)
-        //                            {
-        //                                alignmentItem.Profiles.Add(new ProfileModel { Name = profile.Name });
-
-        //                            }
-        //                        }
-
-        //                        AlignmentItems.Add(alignmentItem);
-        //                        allAlignmentNames.Add(alignment.Name);
-        //                    }
-        //                }
-        //            }
-        //            tr.Commit();
-        //        }
-        //    }
-        //}
-        //private void AddAlignmentAndProfiles()
-        //{
-        //    using (var db = HostApplicationServices.WorkingDatabase)
-        //    {
-        //        using (Transaction tr = db.TransactionManager.StartTransaction())
-        //        {
-        //            BlockTable bt = tr.GetObject(db.BlockTableId, OpenMode.ForRead) as BlockTable;
-        //            BlockTableRecord btr = tr.GetObject(bt[BlockTableRecord.ModelSpace], OpenMode.ForRead) as BlockTableRecord;
-
-        //            foreach (ObjectId entId in btr)
-        //            {
-        //                if (entId.ObjectClass.IsDerivedFrom(RXObject.GetClass(typeof(Alignment))))
-        //                {
-        //                    Alignment alignment = tr.GetObject(entId, OpenMode.ForRead) as Alignment;
-        //                    if (alignment != null)
-        //                    {
-        //                        List<string> profileNames = new List<string>();
-        //                        var alignmentItem = new ListViewItemModel
-        //                        {
-        //                            Name = alignment.Name,
-        //                            Profiles = new ObservableCollection<ProfileModel>()
-        //                        };
-
-        //                        AlignmentItems.Add(alignmentItem);
-        //                        if (!allAlignmentData.ContainsKey(alignment.Name)) // Add alignment name to allAlignmentData
-        //                        {
-        //                            allAlignmentData[alignment.Name] = new List<string>();
-        //                        }
-
-        //                        ObjectIdCollection profileIds = alignment.GetProfileIds();
-        //                        foreach (ObjectId profileId in profileIds)
-        //                        {
-        //                            Autodesk.Civil.DatabaseServices.Profile profile = tr.GetObject(profileId, OpenMode.ForRead) as Autodesk.Civil.DatabaseServices.Profile;
-        //                            if (profile != null)
-        //                            {
-        //                                alignmentItem.Profiles.Add(new ProfileModel { Name = profile.Name });                                  
-        //                                allAlignmentData[alignment.Name].Add(profile.Name);// Add profile name to allAlignmentData
-        //                            }
-        //                        }
-
-
-        //                    }
-        //                }
-        //            }
-        //            tr.Commit();
-        //        }
-        //    }
-        //}
         private void AddAlignmentAndProfiles()
         {
             using (var db = HostApplicationServices.WorkingDatabase)
@@ -616,33 +380,32 @@ namespace Infrakit.Windows
                             Alignment alignment = tr.GetObject(entId, OpenMode.ForRead) as Alignment;
                             if (alignment != null)
                             {
-                                var alignmentItem = new ListViewItemModel
+                                if (alignment.FingerPrint!=0)
                                 {
-                                    Name = alignment.Name,
-                                    Profiles = new ObservableCollection<ProfileModel>()
-                                };
-
-                                AlignmentItems.Add(alignmentItem);
-
-                                // Initialize SelectedAlignmentProfile for the alignment
-                                allAlignmentData[alignment.Name] = new SelectedAlignmentProfile
-                                {
-                                    AlignmentName = alignment.Name,
-                                    ProfileNames = new List<string>(), // Initialize the list of profile names
-                                };
-
-                                ObjectIdCollection profileIds = alignment.GetProfileIds();
-                                foreach (ObjectId profileId in profileIds)
-                                {
-                                    Autodesk.Civil.DatabaseServices.Profile profile = tr.GetObject(profileId, OpenMode.ForRead) as Autodesk.Civil.DatabaseServices.Profile;
-                                    if (profile != null)
+                                    var alignmentItem = new ListViewItemModel
                                     {
-                                        alignmentItem.Profiles.Add(new ProfileModel { Name = profile.Name });
+                                        Name = alignment.Name,
+                                        Profiles = new ObservableCollection<ProfileModel>()
+                                    };
 
-                                        // Add profile name to allAlignmentData
-                                        allAlignmentData[alignment.Name].ProfileNames.Add(profile.Name);
+                                    AlignmentItems.Add(alignmentItem);
+                                    allAlignmentData[alignment.Name] = new SelectedAlignmentProfile
+                                    {
+                                        AlignmentName = alignment.Name,
+                                        ProfileNames = new List<ProfileModel>(), // Initialize the list of profiles
+                                        IsAlignmentSelected = false // Assuming alignment starts unselected
+                                    };
+                                    ObjectIdCollection profileIds = alignment.GetProfileIds();
+                                    foreach (ObjectId profileId in profileIds)
+                                    {
+                                        Autodesk.Civil.DatabaseServices.Profile profile = tr.GetObject(profileId, OpenMode.ForRead) as Autodesk.Civil.DatabaseServices.Profile;
+                                        if (profile != null)
+                                        {
+                                            alignmentItem.Profiles.Add(new ProfileModel { Name = profile.Name });
+                                            allAlignmentData[alignment.Name].ProfileNames.Add(new ProfileModel { Name = profile.Name });
+                                        }
                                     }
-                                }
+                                }                                
                             }
                         }
                     }
@@ -813,206 +576,186 @@ namespace Infrakit.Windows
             }
         }
 
-        private void BtnLaeUlesse(object sender, RoutedEventArgs e)
+        private void BtnLaePinnadUlesseUus(object sender, RoutedEventArgs e)
         {
-            Upload();
-        }
-        private void BtnLaeUlesseUus(object sender, RoutedEventArgs e)
-        {
-            UploadNew();
+            UploadSurfaces();
         }
 
-        private string GetAccessToken()
-        {
 
-            using (WebClient client = new WebClient())
-            {
-                String Salasona;
-                client.Encoding = Encoding.UTF8;
-                string url = "https://iam.infrakit.com/auth/token";
-                Salasona = DecryptedPassword ? ParoolPasswordBox.Password : Parool.Text; // Assign the value based on the condition
-                //string postData = "grant_type=password&username=" + Kasutajanimi.Text + "&password=" + ParoolPasswordBox.Password;
-                string postData = "grant_type=password&username=" + Kasutajanimi.Text + "&password=" + Salasona;
-                client.Headers[HttpRequestHeader.ContentType] = "application/x-www-form-urlencoded";
-                responseText = client.UploadString(url, postData);
-                JObject json = JObject.Parse(responseText);
-                accessToken = (string)json["accessToken"];
-            }
-            return accessToken;
-        }
-        private void BtnLogiSisse(object sender, RoutedEventArgs e)
+        private void ProcessSurfaces(string exportFilePath, Database db)
         {
-            try
+            List<string> surfacesToKeep = new List<string>();
+            foreach (ListViewItemModel surfaceItem in SurfaceItems)
             {
-                accessToken = GetAccessToken();
-                GetProjects();
+                if (surfaceItem.IsSelected)
+                {
+                    surfacesToKeep.Add(surfaceItem.Name);
+                    //surfacesToKeep.Add(surfaceItem.Name.Replace(' ', '_'));
+                }
             }
-            catch (WebException webEx)
+            SplitLandXMLSurfaces(exportFilePath, surfacesToKeep);
+            foreach (ListViewItemModel surfaceItem in SurfaceItems)
             {
-                HandleWebException(webEx);
+                if (surfaceItem.IsSelected)
+                {
+                    string filePath = System.IO.Path.GetDirectoryName(db.Filename) + "\\" + surfaceItem.Name + ".xml";
+                    if (PinnaKaust.Text != "")
+                    {
+                        filePath = PinnaKaust.Text + "\\" + surfaceItem.Name + ".xml";
+                    }
+
+                    string accessToken = GetAccessToken();
+                    UploadFile(filePath, surfaceItem.Name, SurfaceFolderNameUUidPairs[PindadeKaustad.SelectedValue.ToString()]);
+                }
             }
         }
 
+        private void BtnLaeTeljedUlesseUus(object sender, RoutedEventArgs e)
 
-        private void Parool_TextChanged(object sender, TextChangedEventArgs e)
         {
-
+            UploadAlignments();
         }
 
-        private void ParoolPasswordBox_PasswordChanged(object sender, RoutedEventArgs e)
+
+        private void ProcessAlignments(string exportFilePath, Database db)
         {
-            if (DecryptedPassword == true)
+            List<string> alignmentsToKeep = new List<string>();
+            List<string> profilesToKeep = new List<string>();
+
+            foreach (ListViewItemModel alignmentItem in AlignmentItems)
             {
-                ParoolPasswordBox.Password = "";
-                DecryptedPassword = false;
+                if (alignmentItem.IsSelected)
+                {
+                    ProfileModel selectedProfile = alignmentItem.Profiles.FirstOrDefault(p => p.IsSubItemSelected);    // Assuming there's only one profile selected for each alignment                           
+                    string profileName = selectedProfile == null ? "" : selectedProfile.Name;
+                    alignmentsToKeep.Add(alignmentItem.Name);
+                    profilesToKeep.Add(selectedProfile == null ? "" : selectedProfile.Name);
+                }
+            }
+
+            SplitLandXMLAlignments(exportFilePath, alignmentsToKeep, profilesToKeep);
+
+            foreach (ListViewItemModel alignmentItem in AlignmentItems)
+            {
+                if (alignmentItem.IsSelected)
+                {
+                    ProfileModel selectedProfile = alignmentItem.Profiles.FirstOrDefault(p => p.IsSubItemSelected);    // Assuming there's only one profile selected for each alignment                           
+                    string profileName = selectedProfile == null ? "" : selectedProfile.Name;
+                    string filePath = System.IO.Path.GetDirectoryName(db.Filename) + "\\" + alignmentItem.Name + ".xml";
+                    if (TeljeKaust.Text != "")
+                    {
+                        filePath = TeljeKaust.Text + "\\" + alignmentItem.Name + ".xml";
+                    }
+
+                    string accessToken = GetAccessToken();
+                    UploadFile(filePath, alignmentItem.Name, AlignmentFolderNameUUidPairs[TelgedeKaustad.SelectedValue.ToString()]);
+                }
             }
         }
 
-        private void ShowPasswordCheckBox_Checked(object sender, RoutedEventArgs e)
+        private void ShowErrorForEmptyFields(string uploadType)
         {
-            if (DecryptedPassword == true)
+            if (string.IsNullOrEmpty(Projektid.Text))
             {
-                MessageBox.Show($"Can not show decrypted password");
-                ShowPasswordCheckBox.Unchecked -= ShowPasswordCheckBox_Unchecked;
-                ShowPasswordCheckBox.IsChecked = false;
-                ShowPasswordCheckBox.Unchecked += ShowPasswordCheckBox_Unchecked;
+                MessageBox.Show("Project is empty!", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            if (string.IsNullOrEmpty(PindadeKaustad.Text) && (uploadType == "SurfaceUpload" || uploadType == "Upload"))
+            {
+                MessageBox.Show("Surface folder is empty!", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            if (string.IsNullOrEmpty(TelgedeKaustad.Text) && (uploadType == "AlignmentUpload" || uploadType == "Upload"))
+            {
+                MessageBox.Show("Alignment folder is empty!", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+        private void ExecuteLandXmlOutCommand(Editor ed, string exportFilePath)
+        {
+            if (Year == "2025")
+            {
+                ed.Command("-LANDXMLOUT", "1.2", exportFilePath);
             }
             else
             {
-                Parool.Text = ParoolPasswordBox.Password;
-                Parool.Visibility = System.Windows.Visibility.Visible;
-                ParoolPasswordBox.Visibility = System.Windows.Visibility.Collapsed;
+                ed.Command("-LANDXMLOUT", exportFilePath);
             }
         }
-        private void ShowPasswordCheckBox_Unchecked(object sender, RoutedEventArgs e)
-        {
-            ParoolPasswordBox.Password = Parool.Text;
-            Parool.Visibility = System.Windows.Visibility.Collapsed;
-            ParoolPasswordBox.Visibility = System.Windows.Visibility.Visible;
-        }
 
+        //private void BtnLaePinnadUlesse(object sender, RoutedEventArgs e)
+        //{
+        //    Document doc = AcAp.DocumentManager.MdiActiveDocument;
+        //    Database db = doc.Database;
+        //    CivilDocument civDoc = CivilApplication.ActiveDocument;
+        //    Stopwatch stopwatch = Stopwatch.StartNew();  // Start the stopwatch
+        //    TimeSpan elapsedTime;
+        //    try
+        //    {
+        //        if (string.IsNullOrEmpty(Projektid.Text) || string.IsNullOrEmpty(PindadeKaustad.Text))
+        //        {
+        //            if (string.IsNullOrEmpty(Projektid.Text))  // Show error message for empty Kasutajanimi.Text
+        //            {
+        //                MessageBox.Show("Project is empty!", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        //            }
+        //            if (string.IsNullOrEmpty(PindadeKaustad.Text)) // Show error message for empty Parool.Text
+        //            {
+        //                MessageBox.Show("Surface folder is empty!", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        //            }
+        //        }
+        //        else
+        //        {
+        //            foreach (ListViewItemModel surfaceItem in SurfaceItems)
+        //            {
+        //                if (surfaceItem.IsSelected)
+        //                {
+        //                    accessToken = GetAccessToken();
 
-        private void GetProjects()
-        {
-            WebClient client = new WebClient();
-            client.Encoding = Encoding.UTF8;
-            string url = "https://app.infrakit.com/kuura/v1/projects";
-            client.Headers[HttpRequestHeader.Authorization] = "Bearer " + accessToken;
-            client.Headers[HttpRequestHeader.ContentType] = "application/json";
-            responseText = client.DownloadString(url);
-            JArray jsonArray = JArray.Parse(responseText);
-            Projektid.SelectionChanged -= Projektid_SelectionChanged;
-            Projektid.Items.Clear();
-            ProjectNameUUidPairs = new Dictionary<string, string>(); // Initialize the dictionary here          
-            foreach (var item in jsonArray)
-            {
-                //Projektid.Items.Add((string)item["name"] + "|" + (string)item["uuid"]);
-                string name = (string)item["name"];
-                string uuid = (string)item["uuid"];
-                ProjectNameUUidPairs.Add(name, uuid);
-                Projektid.Items.Add(name);
-            }
-            Projektid.SelectedIndex = 0;
-            Projektid.SelectionChanged += Projektid_SelectionChanged;
-            AddOrUpdateDictionaryEntriesFromTextBox("Projekt", Projektid.Text);
-            AddOrUpdateDictionaryEntriesFromTextBox("ProjektUUid", ProjectNameUUidPairs[Projektid.Text]);
-            ProjectUUid = ProjectNameUUidPairs[Projektid.Text];
-            GetFolders(ProjectUUid);
-        }
+        //                    // Find the surface with the given name
+        //                    ObjectId surfaceId = ObjectId.Null;
+        //                    using (Transaction tr = db.TransactionManager.StartTransaction())
+        //                    {
+        //                        TinSurface surface = tr.GetObject(GetSurfaceIdByName(civDoc, surfaceItem.Name), OpenMode.ForRead) as TinSurface;
+        //                        if (surface != null)
+        //                        {
+        //                            surfaceId = surface.Id;
+        //                        }
+        //                        tr.Commit();
+        //                    }
 
-        private void GetFolders(string ProjectUUid)
-        {
-            WebClient client = new WebClient();
-            client.Encoding = Encoding.UTF8;
-            string url = $"https://app.infrakit.com/kuura/v1/project/{ProjectUUid}/folders?depth=-1";
-            client.Headers[HttpRequestHeader.Authorization] = $"Bearer {accessToken}";
-            client.Headers[HttpRequestHeader.ContentType] = "application/json";
-            string responseText = client.DownloadString(url);
-            JObject data = JObject.Parse(responseText);
-            JArray folders = (JArray)data["folders"];
-            // Temporarily detach the event handler
-            PindadeKaustad.SelectionChanged -= PindadeKaustad_SelectionChanged;
-            PindadeKaustad.Items.Clear();
-            TelgedeKaustad.SelectionChanged -= TelgedeKaustad_SelectionChanged;
-            TelgedeKaustad.Items.Clear();
-            SurfaceFolderNameUUidPairs = new Dictionary<string, string>(); // Initialize the dictionary here
-            AlignmentFolderNameUUidPairs = new Dictionary<string, string>(); // Initialize the dictionary here
+        //                    using (Transaction tr = db.TransactionManager.StartTransaction())
+        //                    {
+        //                        TinSurface surface = tr.GetObject(surfaceId, OpenMode.ForRead) as TinSurface;
 
-            // Dictionary to store folder information by UUID
-            var folderDict = folders.ToDictionary(
-                f => (string)f["uuid"],
-                f => new
-                {
-                    Uuid = (string)f["uuid"],
-                    Name = (string)f["name"],
-                    ParentFolderUuid = (string)f["parentFolderUuid"],
-                    Depth = (int)f["depth"]
-                });
-            Action<string, int> buildFolderStructure = null; // Helper function to build folder structure recursively and add to collections
-            buildFolderStructure = (uuid, level) =>
-            {
-                var folder = folderDict[uuid];
-                string folderName = (level > 1) ? new string('-', level - 1) + folder.Name : folder.Name;
+        //                        if (surface == null)
+        //                        {
+        //                            AcAp.DocumentManager.MdiActiveDocument.Editor.WriteMessage("Failed to open surface!");
+        //                            return;
+        //                        }
+        //                        string filePath = CreateAndSaveSurfaceLandXMLToFile(surface, surfaceItem.Name);
+        //                        if (filePath != null)
+        //                        {
+        //                            UploadFile(filePath, surfaceItem.Name, SurfaceFolderNameUUidPairs[PindadeKaustad.SelectedValue.ToString()]);
+        //                        }
+        //                        tr.Commit();
+        //                    }
+        //                }
+        //            }
+        //            elapsedTime = stopwatch.Elapsed;  // Get the elapsed time as a TimeSpan                 
+        //            MessageBox.Show($"Upload complete. It took {elapsedTime.ToString(@"mm\:ss")} to complete.");
+        //        }
+        //    }
 
-                if (folder.Name != "root")
-                {
-                    SurfaceFolderNameUUidPairs.Add(folderName, uuid);
-                    PindadeKaustad.Items.Add(folderName);
-                    AlignmentFolderNameUUidPairs.Add(folderName, uuid);
-                    TelgedeKaustad.Items.Add(folderName);
-                }
-                foreach (var subfolder in folders)
-                {
-                    if ((string)subfolder["parentFolderUuid"] == uuid)
-                    {
-                        buildFolderStructure((string)subfolder["uuid"], level + 1);
-                    }
-                }
-            };
-            foreach (var folder in folderDict.Values.Where(f => f.Depth == 0)) // Start building the structure from the root folders
-            {
-                buildFolderStructure(folder.Uuid, 0);
-            }
-            PindadeKaustad.SelectedIndex = 0;
-            PindadeKaustad.SelectionChanged += PindadeKaustad_SelectionChanged;
-            AddOrUpdateDictionaryEntriesFromTextBox("PinnadKaust", PindadeKaustad.Text);
-            AddOrUpdateDictionaryEntriesFromTextBox("PinnadKaustUUid", SurfaceFolderNameUUidPairs[PindadeKaustad.Text]);
-            TelgedeKaustad.SelectedIndex = 0;
-            TelgedeKaustad.SelectionChanged += TelgedeKaustad_SelectionChanged;
-            AddOrUpdateDictionaryEntriesFromTextBox("TeljedKaust", TelgedeKaustad.Text);
-            AddOrUpdateDictionaryEntriesFromTextBox("TeljedKaustUUid", AlignmentFolderNameUUidPairs[TelgedeKaustad.Text]);
-        }
-
-
-        private void Projektid_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            try
-            {
-
-                AddOrUpdateDictionaryEntriesFromTextBox("Projekt", Projektid.SelectedValue.ToString());
-                AddOrUpdateDictionaryEntriesFromTextBox("ProjektUUid", ProjectNameUUidPairs[Projektid.SelectedValue.ToString()]);
-                ProjectUUid = ProjectNameUUidPairs[Projektid.SelectedValue.ToString()];
-                accessToken = GetAccessToken();
-                GetFolders(ProjectUUid);
-            }
-            catch (WebException webEx)
-            {
-                HandleWebException(webEx);
-            }
-
-        }
-
-        private void PindadeKaustad_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            AddOrUpdateDictionaryEntriesFromTextBox("PinnadKaust", PindadeKaustad.SelectedValue.ToString());
-            AddOrUpdateDictionaryEntriesFromTextBox("PinnadKaustUUid", SurfaceFolderNameUUidPairs[PindadeKaustad.SelectedValue.ToString()]);
-        }
-        private void TelgedeKaustad_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            AddOrUpdateDictionaryEntriesFromTextBox("TeljedKaust", TelgedeKaustad.SelectedValue.ToString());
-            AddOrUpdateDictionaryEntriesFromTextBox("TeljedKaustUUid", AlignmentFolderNameUUidPairs[TelgedeKaustad.SelectedValue.ToString()]);
-        }
-
+        //    catch (WebException webEx)
+        //    {
+        //        HandleWebException(webEx);
+        //    }
+        //    catch (Autodesk.AutoCAD.Runtime.Exception ex)
+        //    {
+        //        MessageBox.Show("Exception: " + ex.Message);
+        //    }
+        //    catch (System.Exception ex)
+        //    {
+        //        MessageBox.Show("Exception: " + ex.Message);
+        //    }
+        //}
         private ObjectId GetSurfaceIdByName(CivilDocument civDoc, string surfaceName)
         {
             foreach (ObjectId surfaceId in civDoc.GetSurfaceIds())
@@ -1074,284 +817,275 @@ namespace Infrakit.Windows
             return filePath;
         }
 
-        public string CreateAndSaveAlignmentLandXMLToFile(Alignment alignment, string filename, string ProfileName)
+        //private void BtnLaeUlesse(object sender, RoutedEventArgs e)
+        //{
+        //    UploadMix();
+        //}
+
+        private void BtnLaeUlesseUus(object sender, RoutedEventArgs e)
         {
-            Document doc = AcAp.DocumentManager.MdiActiveDocument;
-            Database db = doc.Database;
-
-            StringBuilder landXMLContent = new StringBuilder();
-            landXMLContent.AppendLine(@"<?xml version=""1.0""?>");
-            landXMLContent.AppendLine(@"<LandXML xmlns=""http://www.landxml.org/schema/LandXML-1.2"" xmlns:xsi=""http://www.w3.org/2001/XMLSchema-instance"" xsi:schemaLocation=""http://www.landxml.org/schema/LandXML-1.2 http://www.landxml.org/schema/LandXML-1.2/LandXML-1.2.xsd"" date=""" + DateTime.Now.ToString("yyyy-MM-dd") + "\" time=\"" + DateTime.Now.ToString("HH:mm:ss") + "\" version=\"1.2\" language=\"English\" readOnly=\"false\">");
-            landXMLContent.AppendLine(@"    <Units>");
-            landXMLContent.AppendLine(@"        <Metric areaUnit=""squareMeter"" linearUnit=""meter"" volumeUnit=""cubicMeter"" temperatureUnit=""celsius"" pressureUnit=""milliBars"" diameterUnit=""millimeter"" angularUnit=""decimal degrees"" directionUnit=""decimal degrees""></Metric>");
-            landXMLContent.AppendLine(@"    </Units>");
-            //<CoordinateSystem desc="Estonian Coordinate System of 1997" epsgCode="3301" ogcWktCode="PROJCS[&quot;Estonia97.Estonia&quot;,GEOGCS[&quot;Estonia97.LL&quot;,DATUM[&quot;Estonia97&quot;,SPHEROID[&quot;GRS1980&quot;,6378137.000,298.25722210],TOWGS84[0.0000,0.0000,0.0000,0.000000,0.000000,0.000000,0.00000000]],PRIMEM[&quot;Greenwich&quot;,0],UNIT[&quot;Degree&quot;,0.017453292519943295]],PROJECTION[&quot;Lambert_Conformal_Conic_2SP&quot;],PARAMETER[&quot;false_easting&quot;,500000.000],PARAMETER[&quot;false_northing&quot;,6375000.000],PARAMETER[&quot;central_meridian&quot;,24.00000000000000],PARAMETER[&quot;latitude_of_origin&quot;,57.51755394444444],PARAMETER[&quot;standard_parallel_1&quot;,59.33333333333334],PARAMETER[&quot;standard_parallel_2&quot;,58.00000000000000],UNIT[&quot;Meter&quot;,1.00000000000000]]" horizontalDatum="Estonia97" horizontalCoordinateSystemName="Estonia97.Estonia" fileLocation="AutoCAD Map Zone Name"></CoordinateSystem>
-            landXMLContent.AppendLine(@"    <Project name=""" + doc.Name + @"""></Project>");
-            landXMLContent.AppendLine(@"    <Application name=""Autodesk Civil 3D Infrakit"" desc=""Civil 3D Infrakit"" manufacturer=""Autodesk, Inc. Infrakit"" version=""" + Year + @""" manufacturerURL=""www.autodesk.com/civil https://infrakit.com/"" timeStamp=""" + DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss") + @"""></Application>");
-            landXMLContent.AppendLine(@"    <Alignments name="""">");
-            landXMLContent.AppendLine(@"        <Alignment name = """ + alignment.Name + @""" length = """ + alignment.Length + @""" desc = """ + alignment.Description + @""">");
-            //staStart = ""122400.""
-            landXMLContent.AppendLine(@"            <CoordGeom>");
-
-            var algus = alignment.Entities.FirstEntity;
-            var lopp = alignment.Entities.LastEntity;
+            Upload();
+        }
 
 
-            AlignmentEntity currentEntity = alignment.Entities.ElementAtOrDefault(algus - 1);
 
-            double pikkus = 0;
-            for (int i = 0; i <= alignment.Entities.Count - 1; i++)
+        private string GetAccessToken()
+        {
+
+            using (WebClient client = new WebClient())
             {
+                String Salasona;
+                client.Encoding = Encoding.UTF8;
+                string url = "https://iam.infrakit.com/auth/token";
+                Salasona = DecryptedPassword ? ParoolPasswordBox.Password : Parool.Text; // Assign the value based on the condition
+                //string postData = "grant_type=password&username=" + Kasutajanimi.Text + "&password=" + ParoolPasswordBox.Password;
+                string postData = "grant_type=password&username=" + Kasutajanimi.Text + "&password=" + Salasona;
+                client.Headers[HttpRequestHeader.ContentType] = "application/x-www-form-urlencoded";
+                responseText = client.UploadString(url, postData);
+                JObject json = JObject.Parse(responseText);
+                accessToken = (string)json["accessToken"];
+            }
+            return accessToken;
+        }
+        private void BtnLogiSisse(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                accessToken = GetAccessToken();
+                GetProjects();
+            }
+            catch (WebException webEx)
+            {
+                HandleWebException(webEx);
+            }
+            catch (Autodesk.AutoCAD.Runtime.Exception ex)
+            {
+                MessageBox.Show("Exception: " + ex.Message);
+            }
+            catch (System.Exception ex)
+            {
+                MessageBox.Show("Exception: " + ex.Message);
+            }
+        }
 
-                if (currentEntity is AlignmentLine line)
+
+        private void Parool_TextChanged(object sender, TextChangedEventArgs e)
+        {
+
+        }
+
+        private void ParoolPasswordBox_PasswordChanged(object sender, RoutedEventArgs e)
+        {
+            if (DecryptedPassword == true)
+            {
+                ParoolPasswordBox.Password = "";
+                DecryptedPassword = false;
+            }
+        }
+
+        private void ShowPasswordCheckBox_Checked(object sender, RoutedEventArgs e)
+        {
+            if (DecryptedPassword == true)
+            {
+                MessageBox.Show($"Can not show decrypted password");
+                ShowPasswordCheckBox.Unchecked -= ShowPasswordCheckBox_Unchecked;
+                ShowPasswordCheckBox.IsChecked = false;
+                ShowPasswordCheckBox.Unchecked += ShowPasswordCheckBox_Unchecked;
+            }
+            else
+            {
+                Parool.Text = ParoolPasswordBox.Password;
+                Parool.Visibility = System.Windows.Visibility.Visible;
+                ParoolPasswordBox.Visibility = System.Windows.Visibility.Collapsed;
+            }
+        }
+        private void ShowPasswordCheckBox_Unchecked(object sender, RoutedEventArgs e)
+        {
+            ParoolPasswordBox.Password = Parool.Text;
+            Parool.Visibility = System.Windows.Visibility.Collapsed;
+            ParoolPasswordBox.Visibility = System.Windows.Visibility.Visible;
+        }
+
+
+        private void GetProjects()
+        {
+            try
+            {          
+                WebClient client = new WebClient();
+                client.Encoding = Encoding.UTF8;
+                string url = "https://app.infrakit.com/kuura/v1/projects";
+                client.Headers[HttpRequestHeader.Authorization] = "Bearer " + accessToken;
+                client.Headers[HttpRequestHeader.ContentType] = "application/json";
+                responseText = client.DownloadString(url);
+                JArray jsonArray = JArray.Parse(responseText);
+                Projektid.SelectionChanged -= Projektid_SelectionChanged;
+                Projektid.Items.Clear();
+                ProjectNameUUidPairs = new Dictionary<string, string>(); // Initialize the dictionary here          
+                foreach (var item in jsonArray)
                 {
-                    landXMLContent.AppendLine($@"               <Line length=""{line.Length}"">");
-                    pikkus = pikkus + line.Length;
-                    landXMLContent.AppendLine($@"                   <Start>{line.StartPoint.Y} {line.StartPoint.X}</Start>");
-                    landXMLContent.AppendLine($@"                   <End>{line.EndPoint.Y} {line.EndPoint.X}</End>");
-                    landXMLContent.AppendLine(@"                </Line>");
+                    //Projektid.Items.Add((string)item["name"] + "|" + (string)item["uuid"]);
+                    string name = (string)item["name"];
+                    string uuid = (string)item["uuid"];
+                    ProjectNameUUidPairs.Add(name, uuid);
+                    Projektid.Items.Add(name);
                 }
-                else if (currentEntity is AlignmentArc curve)
-                {
-                    //string clockwise = curve.Clockwise ? "cw" : "ccw"; // Convert rotation direction boolean to string
+                Projektid.SelectedIndex = 0;
+                Projektid.SelectionChanged += Projektid_SelectionChanged;
+                AddOrUpdateDictionaryEntriesFromTextBox("Projekt", Projektid.Text);
+                AddOrUpdateDictionaryEntriesFromTextBox("ProjektUUid", ProjectNameUUidPairs[Projektid.Text]);
+                ProjectUUid = ProjectNameUUidPairs[Projektid.Text];
+                GetFolders(ProjectUUid);
+            }
+            catch (WebException webEx)
+            {
+                HandleWebException(webEx);
+            }
+            catch (Autodesk.AutoCAD.Runtime.Exception ex)
+            {
+                MessageBox.Show("Exception: " + ex.Message);
+            }
+            catch (System.Exception ex)
+            {
+                MessageBox.Show("Exception: " + ex.Message);
+            }
+        }
+                
+        private void GetFolders(string ProjectUUid)
+        {
+            try
+            {
+                WebClient client = new WebClient();
+                client.Encoding = Encoding.UTF8;
+                string url = $"https://app.infrakit.com/kuura/v1/project/{ProjectUUid}/folders?depth=-1";
+                client.Headers[HttpRequestHeader.Authorization] = $"Bearer {accessToken}";
+                client.Headers[HttpRequestHeader.ContentType] = "application/json";
+                string responseText = client.DownloadString(url);
+                JObject data = JObject.Parse(responseText);
+                JArray folders = (JArray)data["folders"];
+                // Temporarily detach the event handler
+                PindadeKaustad.SelectionChanged -= PindadeKaustad_SelectionChanged;
+                PindadeKaustad.Items.Clear();
+                TelgedeKaustad.SelectionChanged -= TelgedeKaustad_SelectionChanged;
+                TelgedeKaustad.Items.Clear();
+                SurfaceFolderNameUUidPairs = new Dictionary<string, string>(); // Initialize the dictionary here
+                AlignmentFolderNameUUidPairs = new Dictionary<string, string>(); // Initialize the dictionary here
 
-                    //landXMLContent.AppendLine($@"               <Curve rot=""{clockwise}"" chord=""{curve.ChordLength}"" crvType=""arc"" external=""{curve.ExternalSecant}"" length=""{curve.Length}"" midOrd=""{curve.MidOrdinate}"" radius=""{curve.Radius}"" tangent=""{curve.ExternalTangent}"">");
-                    //pikkus = pikkus + curve.ChordLength;
-                    //landXMLContent.AppendLine($@"                   <Start>{curve.StartPoint.Y} {curve.StartPoint.X}</Start>");
-                    //landXMLContent.AppendLine($@"                   <Center>{curve.CenterPoint.Y} {curve.CenterPoint.X}</Center>");
-                    //landXMLContent.AppendLine($@"                   <End>{curve.EndPoint.Y} {curve.EndPoint.X}</End>");
-                    //landXMLContent.AppendLine(@"                </Curve>");
-
-                    string clockwise = curve.Clockwise ? "cw" : "ccw"; // Convert rotation direction boolean to string
-                    landXMLContent.AppendLine($@"               <Curve rot=""{clockwise}"" chord=""{curve.ChordLength}"" crvType=""arc"" delta=""{curve.Delta}"" dirEnd=""{curve.EndDirection}"" dirStart=""{curve.StartDirection}"" external=""{curve.ExternalSecant}"" length=""{curve.Length}"" midOrd=""{curve.MidOrdinate}"" radius=""{curve.Radius}"" tangent=""{curve.ExternalTangent}"">");
-                    pikkus = pikkus + curve.Length;
-                    landXMLContent.AppendLine($@"                   <Start>{curve.StartPoint.Y} {curve.StartPoint.X}</Start>");
-                    landXMLContent.AppendLine($@"                   <Center>{curve.CenterPoint.Y} {curve.CenterPoint.X}</Center>");
-                    landXMLContent.AppendLine($@"                   <End>{curve.EndPoint.Y} {curve.EndPoint.X}</End>");
-                    //landXMLContent.AppendLine($@"                   <PI>{curve.PointOfIntersection.Y} {curve.PointOfIntersection.X}</PI>");
-                    landXMLContent.AppendLine(@"                </Curve>");
-
-                }
-                else if (currentEntity is AlignmentSCS spiral)
-                {
-                    ////string clockwise = spiral.Clockwise ? "cw" : "ccw"; // Convert rotation direction boolean to string
-                    ////rot = ""{ clockwise}""
-                    ////spiType = ""{ spiral.SpiralType}""                 
-                    //landXMLContent.AppendLine($@"               <Spiral staStart=""{spiral.StartStation}"" length=""{spiral.Length}"" radiusStart=""{spiral.SpiralOut.RadiusOut}"" radiusEnd=""{spiral.SpiralOut.RadiusIn}"" >");                 
-                    ////desc=""{spiral.Description}""
-                    ////constant = ""{ spiral.Constant}""                    
-                    ////dirStart=""{spiral.}""
-                    ////dirEnd=""{spiral.EndDirection}""
-                    //pikkus = pikkus + spiral.Length;
-                    //landXMLContent.AppendLine($@"                   <Start>{spiral.StartPoint.Y} {spiral.StartPoint.X}</Start>");
-                    ////landXMLContent.AppendLine($@"                   <PI>{spiral.center {spiral.PointOfIntersection.X}</PI>");
-                    //landXMLContent.AppendLine($@"                   <End>{spiral.EndPoint.Y} {spiral.EndPoint.X}</End>");
-                    //landXMLContent.AppendLine(@"                </Spiral>");
-
-
-                    string clockwise = "";
-                    switch (spiral.EntityType.ToString())
+                // Dictionary to store folder information by UUID
+                var folderDict = folders.ToDictionary(
+                    f => (string)f["uuid"],
+                    f => new
                     {
-                        case "SpiralCurveSpiral":
-                            clockwise = spiral.SpiralIn.Direction == SpiralDirectionType.DirectionLeft ? "ccw" : "cw"; // Convert direction to rotation string
-                            landXMLContent.AppendLine($@"               <Spiral length=""{spiral.SpiralIn.Length}"" radiusEnd=""{spiral.SpiralIn.RadiusOut}"" radiusStart=""{spiral.SpiralIn.RadiusIn}"" rot =""{ clockwise}"" spiType=""{spiral.SpiralIn.SpiralDefinition}"" totalY=""{spiral.SpiralIn.TotalY}"" totalX=""{spiral.SpiralIn.TotalX}"" tanLong=""{spiral.SpiralIn.LongTangent}"" tanShort=""{spiral.SpiralIn.ShortTangent}"">");
-                            //theta = ""{ spiral.Theta}""
-                            landXMLContent.AppendLine($@"                   <Start>{spiral.SpiralIn.StartPoint.Y} {spiral.SpiralIn.StartPoint.X}</Start>");
-                            //landXMLContent.AppendLine($@"                   <PI>{spiral.PointOfIntersection.Y} {spiral.PointOfIntersection.X}</PI>");
-                            landXMLContent.AppendLine($@"                   <End>{spiral.SpiralIn.EndPoint.Y} {spiral.SpiralIn.EndPoint.X}</End>");
-                            landXMLContent.AppendLine(@"                </Spiral>");
+                        Uuid = (string)f["uuid"],
+                        Name = (string)f["name"],
+                        ParentFolderUuid = (string)f["parentFolderUuid"],
+                        Depth = (int)f["depth"]
+                    });
 
-                            clockwise = spiral.Arc.Clockwise ? "cw" : "ccw"; // Convert rotation direction boolean to string
-                            landXMLContent.AppendLine($@"               <Curve rot=""{clockwise}"" chord=""{spiral.Arc.ChordLength}"" crvType=""arc"" delta=""{spiral.Arc.Delta}"" dirEnd=""{spiral.Arc.EndDirection}"" dirStart=""{spiral.Arc.StartDirection}"" external=""{spiral.Arc.ExternalSecant}"" length=""{spiral.Arc.Length}"" midOrd=""{spiral.Arc.MidOrdinate}"" radius=""{spiral.Arc.Radius}"" tangent=""{spiral.Arc.ExternalTangent}"">");
-                            pikkus = pikkus + spiral.Arc.Length;
-                            landXMLContent.AppendLine($@"                   <Start>{spiral.Arc.StartPoint.Y} {spiral.Arc.StartPoint.X}</Start>");
-                            landXMLContent.AppendLine($@"                   <Center>{spiral.Arc.CenterPoint.Y} {spiral.Arc.CenterPoint.X}</Center>");
-                            landXMLContent.AppendLine($@"                   <End>{spiral.Arc.EndPoint.Y} {spiral.Arc.EndPoint.X}</End>");
-                            //landXMLContent.AppendLine($@"                   <PI>{spiral.Arc.PointOfIntersection.Y} {spiral.Arc.PointOfIntersection.X}</PI>");
-                            landXMLContent.AppendLine(@"                </Curve>");
+                // Function to get folder path recursively
+                Func<string, string> GetFolderPath = null;
+                GetFolderPath = (uuid) =>
+                {
+                    var folder = folderDict[uuid];
+                    if (folder.ParentFolderUuid != null && folder.ParentFolderUuid != "root")
+                    {
+                        string parentPath = GetFolderPath(folder.ParentFolderUuid);
+                        return (parentPath != "root" ? parentPath + "\\" : "") + folder.Name;
+                    }
+                    return folder.Name;
+                };
 
-                            clockwise = spiral.SpiralOut.Direction == SpiralDirectionType.DirectionLeft ? "ccw" : "cw"; // Convert direction to rotation string
-                            landXMLContent.AppendLine($@"               <Spiral length=""{spiral.SpiralOut.Length}"" radiusEnd=""{spiral.SpiralOut.RadiusOut}"" radiusStart=""{spiral.SpiralOut.RadiusIn}"" rot =""{ clockwise}"" spiType=""{spiral.SpiralOut.SpiralDefinition}"" totalY=""{spiral.SpiralOut.TotalY}"" totalX=""{spiral.SpiralOut.TotalX}"" tanLong=""{spiral.SpiralOut.LongTangent}"" tanShort=""{spiral.SpiralOut.ShortTangent}"">");
-                            //theta = ""{ spiral.Theta}""
-                            landXMLContent.AppendLine($@"                   <Start>{spiral.SpiralOut.StartPoint.Y} {spiral.SpiralOut.StartPoint.X}</Start>");
-                            //landXMLContent.AppendLine($@"                   <PI>{spiral.PointOfIntersection.Y} {spiral.PointOfIntersection.X}</PI>");
-                            landXMLContent.AppendLine($@"                   <End>{spiral.SpiralOut.EndPoint.Y} {spiral.SpiralOut.EndPoint.X}</End>");
-                            landXMLContent.AppendLine(@"                </Spiral>");
-                            break;
-                        case "Spiral":
-                            clockwise = spiral.SpiralOut.Direction == SpiralDirectionType.DirectionLeft ? "ccw" : "cw"; // Convert direction to rotation string
-                            landXMLContent.AppendLine($@"               <Spiral length=""{spiral.SpiralOut.Length}"" radiusEnd=""{spiral.SpiralOut.RadiusOut}"" radiusStart=""{spiral.SpiralOut.RadiusIn}"" rot =""{ clockwise}"" spiType=""{spiral.SpiralOut.SpiralDefinition}"" totalY=""{spiral.SpiralOut.TotalY}"" totalX=""{spiral.SpiralOut.TotalX}"" tanLong=""{spiral.SpiralOut.LongTangent}"" tanShort=""{spiral.SpiralOut.ShortTangent}"">");
-                            //theta = ""{ spiral.Theta}""
-                            landXMLContent.AppendLine($@"                   <Start>{spiral.StartPoint.Y} {spiral.StartPoint.X}</Start>");
-                            //landXMLContent.AppendLine($@"                   <PI>{spiral.PointOfIntersection.Y} {spiral.PointOfIntersection.X}</PI>");
-                            landXMLContent.AppendLine($@"                   <End>{spiral.EndPoint.Y} {spiral.EndPoint.X}</End>");
-                            landXMLContent.AppendLine(@"                </Spiral>");
-                            break;
-                        case "CurveSpiral":
-                            clockwise = spiral.Arc.Clockwise ? "cw" : "ccw"; // Convert rotation direction boolean to string
-                            landXMLContent.AppendLine($@"               <Curve rot=""{clockwise}"" chord=""{spiral.Arc.ChordLength}"" crvType=""arc"" delta=""{spiral.Arc.Delta}"" dirEnd=""{spiral.Arc.EndDirection}"" dirStart=""{spiral.Arc.StartDirection}"" external=""{spiral.Arc.ExternalSecant}"" length=""{spiral.Arc.Length}"" midOrd=""{spiral.Arc.MidOrdinate}"" radius=""{spiral.Arc.Radius}"" tangent=""{spiral.Arc.ExternalTangent}"">");
-                            pikkus = pikkus + spiral.Arc.Length;
-                            landXMLContent.AppendLine($@"                   <Start>{spiral.Arc.StartPoint.Y} {spiral.Arc.StartPoint.X}</Start>");
-                            landXMLContent.AppendLine($@"                   <Center>{spiral.Arc.CenterPoint.Y} {spiral.Arc.CenterPoint.X}</Center>");
-                            landXMLContent.AppendLine($@"                   <End>{spiral.Arc.EndPoint.Y} {spiral.Arc.EndPoint.X}</End>");
-                            //landXMLContent.AppendLine($@"                   <PI>{spiral.Arc.PointOfIntersection.Y} {spiral.Arc.PointOfIntersection.X}</PI>");
-                            landXMLContent.AppendLine(@"                </Curve>");
+                Action<string, int> buildFolderStructure = null;
+                buildFolderStructure = (uuid, level) =>
+                {
+                    var folder = folderDict[uuid];
 
-                            clockwise = spiral.SpiralOut.Direction == SpiralDirectionType.DirectionLeft ? "ccw" : "cw"; // Convert direction to rotation string
-                            landXMLContent.AppendLine($@"               <Spiral length=""{spiral.SpiralOut.Length}"" radiusEnd=""{spiral.SpiralOut.RadiusOut}"" radiusStart=""{spiral.SpiralOut.RadiusIn}"" rot =""{ clockwise}"" spiType=""{spiral.SpiralOut.SpiralDefinition}"" totalY=""{spiral.SpiralOut.TotalY}"" totalX=""{spiral.SpiralOut.TotalX}"" tanLong=""{spiral.SpiralOut.LongTangent}"" tanShort=""{spiral.SpiralOut.ShortTangent}"">");
-                            //theta = ""{ spiral.Theta}""
-                            landXMLContent.AppendLine($@"                   <Start>{spiral.SpiralOut.StartPoint.Y} {spiral.SpiralOut.StartPoint.X}</Start>");
-                            //landXMLContent.AppendLine($@"                   <PI>{spiral.PointOfIntersection.Y} {spiral.PointOfIntersection.X}</PI>");
-                            landXMLContent.AppendLine($@"                   <End>{spiral.SpiralOut.EndPoint.Y} {spiral.SpiralOut.EndPoint.X}</End>");
-                            landXMLContent.AppendLine(@"                </Spiral>");
-                            break;
-                        case "SpiralCurve":
-                            clockwise = spiral.SpiralIn.Direction == SpiralDirectionType.DirectionLeft ? "ccw" : "cw"; // Convert direction to rotation string
-                            landXMLContent.AppendLine($@"               <Spiral length=""{spiral.SpiralIn.Length}"" radiusEnd=""{spiral.SpiralIn.RadiusOut}"" radiusStart=""{spiral.SpiralIn.RadiusIn}"" rot =""{ clockwise}"" spiType=""{spiral.SpiralIn.SpiralDefinition}"" totalY=""{spiral.SpiralIn.TotalY}"" totalX=""{spiral.SpiralIn.TotalX}"" tanLong=""{spiral.SpiralIn.LongTangent}"" tanShort=""{spiral.SpiralIn.ShortTangent}"">");
-                            //theta = ""{ spiral.Theta}""
-                            landXMLContent.AppendLine($@"                   <Start>{spiral.SpiralIn.StartPoint.Y} {spiral.SpiralIn.StartPoint.X}</Start>");
-                            //landXMLContent.AppendLine($@"                   <PI>{spiral.PointOfIntersection.Y} {spiral.PointOfIntersection.X}</PI>");
-                            landXMLContent.AppendLine($@"                   <End>{spiral.SpiralIn.EndPoint.Y} {spiral.SpiralIn.EndPoint.X}</End>");
-                            landXMLContent.AppendLine(@"                </Spiral>");
+                    if (folder.Name != "root")
+                    {
+                        string folderName = (level > 0) ? GetFolderPath(uuid) : folder.Name;
 
-                            clockwise = spiral.Arc.Clockwise ? "cw" : "ccw"; // Convert rotation direction boolean to string
-                            landXMLContent.AppendLine($@"               <Curve rot=""{clockwise}"" chord=""{spiral.Arc.ChordLength}"" crvType=""arc"" delta=""{spiral.Arc.Delta}"" dirEnd=""{spiral.Arc.EndDirection}"" dirStart=""{spiral.Arc.StartDirection}"" external=""{spiral.Arc.ExternalSecant}"" length=""{spiral.Arc.Length}"" midOrd=""{spiral.Arc.MidOrdinate}"" radius=""{spiral.Arc.Radius}"" tangent=""{spiral.Arc.ExternalTangent}"">");
-                            pikkus = pikkus + spiral.Arc.Length;
-                            landXMLContent.AppendLine($@"                   <Start>{spiral.Arc.StartPoint.Y} {spiral.Arc.StartPoint.X}</Start>");
-                            landXMLContent.AppendLine($@"                   <Center>{spiral.Arc.CenterPoint.Y} {spiral.Arc.CenterPoint.X}</Center>");
-                            landXMLContent.AppendLine($@"                   <End>{spiral.Arc.EndPoint.Y} {spiral.Arc.EndPoint.X}</End>");
-                            //landXMLContent.AppendLine($@"                   <PI>{spiral.Arc.PointOfIntersection.Y} {spiral.Arc.PointOfIntersection.X}</PI>");
-                            landXMLContent.AppendLine(@"                </Curve>");
-                            break;
-
-                        default:
-                            MessageBox.Show($"Koodi pole lisatud varianti {spiral.EntityType.ToString()} , see tuleb koodi lisada");
-                            break;
+                        SurfaceFolderNameUUidPairs.Add(folderName, uuid);
+                        PindadeKaustad.Items.Add(folderName);
+                        AlignmentFolderNameUUidPairs.Add(folderName, uuid);
+                        TelgedeKaustad.Items.Add(folderName);
                     }
 
-
-                }
-
-
-
-
-                if (pikkus == alignment.Length)
-                {
-                    break;
-                }
-
-                if (i != alignment.Entities.Count - 1)
-                {
-                    var nextEntityId = currentEntity.EntityAfter;
-                    var nextEntity = alignment.Entities.FirstOrDefault(next => next.EntityId == nextEntityId); // Find the next entity using LINQ
-                    currentEntity = nextEntity;
-                }
-            }
-
-            landXMLContent.AppendLine(@"            </CoordGeom>");
-            if (ProfileName != "")
-            {
-                landXMLContent.AppendLine($@"            <Profile name=""{alignment.Name}"">");
-
-                // Get the profiles collection of the alignment
-                ObjectIdCollection profileIds = alignment.GetProfileIds();
-
-                using (Transaction tr = db.TransactionManager.StartTransaction())
-                {
-                    // Iterate through the profiles
-                    foreach (ObjectId profileId in profileIds)
+                    foreach (var subfolder in folders)
                     {
-                        Profile profile = tr.GetObject(profileId, OpenMode.ForRead) as Profile;
-                        if (profile.Name == ProfileName)
+                        if ((string)subfolder["parentFolderUuid"] == uuid)
                         {
-                            if (profile.ProfileType.ToString() == "File" || profile.ProfileType.ToString() == "EG")
-                            {
-                                landXMLContent.AppendLine($@"                <ProfSurf name=""{profile.Name}"">");
-                                //landXMLContent.AppendLine($@"                <ProfSurf name=""{profile.Name}"" state=""Ei tea kust kuleb"">");
-                                StringBuilder pntList2D = new StringBuilder();
-                                foreach (var element in profile.PVIs) // Assuming Elements is a collection of profile elements (PVIs and CircCurves)
-                                {
-                                    pntList2D.Append($"{element.Station} {element.Elevation} ");
-                                }
-                                landXMLContent.AppendLine($@"                   <PntList2D>{pntList2D.ToString().Trim()}</PntList2D>");
-                                landXMLContent.AppendLine(@"                </ProfSurf>");
-                            }
-
-                            if (profile.ProfileType.ToString() == "FG")
-                            {
-                                landXMLContent.AppendLine($@"                <ProfAlign name=""{profile.Name}"">");
-                                foreach (var element in profile.PVIs) // Assuming Elements is a collection of profile elements (PVIs and CircCurves)
-                                {
-
-                                    if (element.PVIType == Autodesk.Civil.DatabaseServices.ProfileEntityType.None)
-                                    {
-                                        landXMLContent.AppendLine($@"                   <PVI>{element.Station} {element.Elevation}</PVI>");
-                                    }
-                                    else if (element.PVIType == Autodesk.Civil.DatabaseServices.ProfileEntityType.ParabolaSymmetric)
-                                    {
-                                        var verticalCurve = element.VerticalCurve as Autodesk.Civil.DatabaseServices.ProfileParabolaSymmetric;
-                                        if (verticalCurve != null)
-                                        {
-                                            landXMLContent.AppendLine($@"                   <ParaCurve length=""{verticalCurve.Length}"" >{element.Station} {element.Elevation}</ParaCurve>");
-
-                                        }
-                                    }
-                                    else if (element.PVIType == Autodesk.Civil.DatabaseServices.ProfileEntityType.ParabolaAsymmetric)
-                                    {
-                                        var verticalCurve = element.VerticalCurve as Autodesk.Civil.DatabaseServices.ProfileParabolaAsymmetric;
-                                        if (verticalCurve != null)
-                                        {
-                                            landXMLContent.AppendLine($@"                   <UnsymParaCurve LengthIn=""{verticalCurve.AsymmetricLength1}"" lengthOut""{verticalCurve.AsymmetricLength2}"">{element.Station} {element.Elevation}</>");
-                                        }
-                                    }
-                                    //else if (element.PVIType.ToString() == "Circular")
-                                    //{
-                                    //    landXMLContent.AppendLine($@"                   <CircCurve length=""{element.VerticalCurve.Length}"" radius=""{element.VerticalCurve}"">{element.Station} {element.Elevation}</CircCurve>");
-                                    //    //landXMLContent.AppendLine($@"                   <CircCurve length=""{element.VerticalCurve.Length}"" radius=""{element.VerticalCurve.Radius}"">{element.Station} {element.Elevation}</CircCurve>");
-                                    //}
-                                    else if (element.PVIType == Autodesk.Civil.DatabaseServices.ProfileEntityType.Circular)
-                                    {
-                                        var verticalCurve = element.VerticalCurve as Autodesk.Civil.DatabaseServices.ProfileCircular;
-                                        if (verticalCurve != null)
-                                        {
-                                            landXMLContent.AppendLine($@"                   <CircCurve length=""{verticalCurve.Length}"" radius=""{verticalCurve.Radius}"">{element.Station} {element.Elevation}</CircCurve>");
-                                        }
-                                    }
-                                    //else if (element.PVIType == Autodesk.Civil.DatabaseServices.ProfileEntityType.Tangent)
-                                    //{
-                                    //    var verticalCurve = element.VerticalCurve as Autodesk.Civil.DatabaseServices.ProfileTangent;
-                                    //    if (verticalCurve != null)
-                                    //    {
-                                    //        landXMLContent.AppendLine($@"                   <ParaCurve length=""{verticalCurve.Length}"" >{element.Station} {element.Elevation}</ParaCurve>");
-                                    //    }
-                                    //}
-                                }
-                                landXMLContent.AppendLine(@"                </ProfAlign>");
-                            }
+                            buildFolderStructure((string)subfolder["uuid"], level + 1);
                         }
                     }
+                };
+
+                foreach (var folder in folderDict.Values.Where(f => f.Depth == 0))
+                {
+                    buildFolderStructure(folder.Uuid, 0);
                 }
 
-                landXMLContent.AppendLine(@"            </Profile>");
-            }
+                PindadeKaustad.SelectedIndex = 0;
+                PindadeKaustad.SelectionChanged += PindadeKaustad_SelectionChanged;
+                AddOrUpdateDictionaryEntriesFromTextBox("PinnadKaust", PindadeKaustad.Text);
+                AddOrUpdateDictionaryEntriesFromTextBox("PinnadKaustUUid", SurfaceFolderNameUUidPairs[PindadeKaustad.Text]);
 
-            // Add superelevation elements
-            foreach (var superelevation in alignment.SuperelevationCurves)
+                TelgedeKaustad.SelectedIndex = 0;
+                TelgedeKaustad.SelectionChanged += TelgedeKaustad_SelectionChanged;
+                AddOrUpdateDictionaryEntriesFromTextBox("TeljedKaust", TelgedeKaustad.Text);
+                AddOrUpdateDictionaryEntriesFromTextBox("TeljedKaustUUid", AlignmentFolderNameUUidPairs[TelgedeKaustad.Text]);
+            }
+            catch (WebException webEx)
             {
-                landXMLContent.AppendLine($@"           <Superelevation staStart=""{superelevation.StartStation}"" staEnd=""{superelevation.EndStation}"" />");
+                HandleWebException(webEx);
             }
-
-            landXMLContent.AppendLine(@"        </Alignment>");
-            landXMLContent.AppendLine(@"    </Alignments>");
-            landXMLContent.AppendLine(@"</LandXML>");
-
-            string filePath = System.IO.Path.GetDirectoryName(db.Filename) + "\\" + filename + ".xml";
-            if (TeljeKaust.Text != "")
+            catch (Autodesk.AutoCAD.Runtime.Exception ex)
             {
-                filePath = TeljeKaust.Text + "\\" + filename + ".xml";
+                MessageBox.Show("Exception: " + ex.Message);
             }
-            System.IO.File.WriteAllText(filePath, landXMLContent.ToString());
-            return filePath;
+            catch (System.Exception ex)
+            {
+                MessageBox.Show("Exception: " + ex.Message);
+            }
+        }
+
+        private void Projektid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            Document doc = AcAp.DocumentManager.MdiActiveDocument;
+            try
+            {
+
+                AddOrUpdateDictionaryEntriesFromTextBox("Projekt", Projektid.SelectedValue.ToString());
+                AddOrUpdateDictionaryEntriesFromTextBox("ProjektUUid", ProjectNameUUidPairs[Projektid.SelectedValue.ToString()]);
+                ProjectUUid = ProjectNameUUidPairs[Projektid.SelectedValue.ToString()];
+                accessToken = GetAccessToken();
+                GetFolders(ProjectUUid);
+            }
+            catch (WebException webEx)
+            {
+                HandleWebException(webEx);
+            }
+            catch (Autodesk.AutoCAD.Runtime.Exception ex)
+            {
+                MessageBox.Show("Projektid_SelectionChanged AutoCAD exception: " + ex.Message);
+                doc.Editor.WriteMessage("\nProjektid_SelectionChanged AutoCAD exception: " + ex.ToString());
+            }
+            catch (System.Exception ex)
+            {
+                MessageBox.Show("Projektid_SelectionChanged System exception: " + ex.Message);
+                doc.Editor.WriteMessage("\nProjektid_SelectionChanged System exception: " + ex.ToString());
+
+            }
+
+        }
+
+        private void PindadeKaustad_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            AddOrUpdateDictionaryEntriesFromTextBox("PinnadKaust", PindadeKaustad.SelectedValue.ToString());
+            AddOrUpdateDictionaryEntriesFromTextBox("PinnadKaustUUid", SurfaceFolderNameUUidPairs[PindadeKaustad.SelectedValue.ToString()]);
+        }
+        private void TelgedeKaustad_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            AddOrUpdateDictionaryEntriesFromTextBox("TeljedKaust", TelgedeKaustad.SelectedValue.ToString());
+            AddOrUpdateDictionaryEntriesFromTextBox("TeljedKaustUUid", AlignmentFolderNameUUidPairs[TelgedeKaustad.SelectedValue.ToString()]);
         }
 
         private void UploadFile(string filePath, string fileName, string folderUuid)
@@ -1432,32 +1166,49 @@ namespace Infrakit.Windows
         {
             Document doc = AcAp.DocumentManager.MdiActiveDocument;
 
-            using (Transaction transaction = doc.TransactionManager.StartTransaction())
+            try
             {
-                Database database = doc.Database;
-                DBDictionary nod = transaction.GetObject(database.NamedObjectsDictionaryId, OpenMode.ForWrite) as DBDictionary;
 
-                if (!nod.Contains("Infrakit"))
+                using (Transaction transaction = doc.TransactionManager.StartTransaction())
                 {
-                    DBDictionary customDict = new DBDictionary();
-                    nod.SetAt("Infrakit", customDict);
-                    transaction.AddNewlyCreatedDBObject(customDict, true);
+                    Database database = doc.Database;
+                    DBDictionary nod = transaction.GetObject(database.NamedObjectsDictionaryId, OpenMode.ForWrite) as DBDictionary;
+                    if (!nod.Contains("Infrakit"))
+                    {
+                        DBDictionary customDict = new DBDictionary();
+                        nod.SetAt("Infrakit", customDict);
+                        transaction.AddNewlyCreatedDBObject(customDict, true);
+                    }
+                    DBDictionary customDictionary = transaction.GetObject(nod.GetAt("Infrakit"), OpenMode.ForWrite) as DBDictionary;
+                    if (customDictionary.Contains(variableName))
+                    {
+                        Xrecord xrec = transaction.GetObject(customDictionary.GetAt(variableName), OpenMode.ForWrite) as Xrecord;
+                        xrec.Data = new ResultBuffer(new TypedValue((int)DxfCode.Text, variableValue));
+
+                    }
+                    else
+                    {
+                        Xrecord xrec = new Xrecord();
+                        xrec.Data = new ResultBuffer(new TypedValue((int)DxfCode.Text, variableValue));
+                        customDictionary.SetAt(variableName, xrec);
+                        transaction.AddNewlyCreatedDBObject(xrec, true);
+                    }
+                    transaction.Commit();
                 }
-                DBDictionary customDictionary = transaction.GetObject(nod.GetAt("Infrakit"), OpenMode.ForWrite) as DBDictionary;
-                if (customDictionary.Contains(variableName))
-                {
-                    Xrecord xrec = transaction.GetObject(customDictionary.GetAt(variableName), OpenMode.ForWrite) as Xrecord;
-                    xrec.Data = new ResultBuffer(new TypedValue((int)DxfCode.Text, variableValue));
-                }
-                else
-                {
-                    Xrecord xrec = new Xrecord();
-                    xrec.Data = new ResultBuffer(new TypedValue((int)DxfCode.Text, variableValue));
-                    customDictionary.SetAt(variableName, xrec);
-                    transaction.AddNewlyCreatedDBObject(xrec, true);
-                }
-                transaction.Commit();
             }
+            catch (Autodesk.AutoCAD.Runtime.Exception ex)
+            {
+                MessageBox.Show("AddOrUpdateDictionaryEntriesFromTextBox AutoCAD exception: " + ex.Message);
+                doc.Editor.WriteMessage("\nAddOrUpdateDictionaryEntriesFromTextBox AutoCAD exception: " + ex.ToString());
+            }
+            catch (System.Exception ex)
+            {
+                MessageBox.Show("AddOrUpdateDictionaryEntriesFromTextBox System exception: " + ex.Message);
+                doc.Editor.WriteMessage("\nAddOrUpdateDictionaryEntriesFromTextBox AutoCAD exception: " + ex.ToString());
+            }
+
+
+
         }
 
         private void AddOrUpdateSurfaceRegistryEntryFromTreeView(TreeView treeView, string surfaceKeyName, List<string> selectedList)
@@ -1524,8 +1275,6 @@ namespace Infrakit.Windows
             }
         }
 
-
-
         private void AddOrUpdateRegistryEntriesFromAlignmentTreeView(TreeView treeView, string AlignmentKeyName, string ProfileKeyName)
         {
             Document doc = AcAp.DocumentManager.MdiActiveDocument;
@@ -1543,23 +1292,42 @@ namespace Infrakit.Windows
                 ResultBuffer alignmentRb = new ResultBuffer();   // Create result buffers for alignment and profile entries
                 ResultBuffer profileRb = new ResultBuffer();
 
-
                 foreach (ListViewItemModel alignment in treeView.Items) // Iterate over the items in the tree view
                 {
                     if (alignment.IsSelected)
                     {
                         alignmentRb.Add(new TypedValue((int)DxfCode.Text, alignment.Name)); // Add the alignment name to the alignment result buffer                        
-                        ProfileModel selectedProfile = alignment.Profiles.FirstOrDefault(profile => profile.IsSubItemSelected); // Check if the alignment has a selected profile
-                        if (selectedProfile != null)
-                        {
-                            profileRb.Add(new TypedValue((int)DxfCode.Text, selectedProfile.Name)); // Add the alignment-profile pair to the profile result buffer
+                        allAlignmentData[alignment.Name].IsAlignmentSelected = true;
+                    }
+                    else
+                    {
+                        allAlignmentData[alignment.Name].IsAlignmentSelected = false;
+                    }
+                    allAlignmentData[alignment.Name].IsProfileSelected = false;
+                    foreach (ProfileModel profile in alignment.Profiles) // Loop through all profiles in the alignment
+                    {
+                        var profileData = allAlignmentData[alignment.Name].ProfileNames.FirstOrDefault(p => p.Name == profile.Name);
+
+                        if (profile.IsSubItemSelected)
+                        {                                
+                            profile.IsSubItemSelected = true; // Select the profile
+                            allAlignmentData[alignment.Name].IsProfileSelected = true;
+                            profileData.IsSubItemSelected = true;
+                            profileRb.Add(new TypedValue((int)DxfCode.Text, profile.Name)); // Add the alignment-profile pair to the profile result buffer   
                         }
                         else
                         {
-                            profileRb.Add(new TypedValue((int)DxfCode.Text, "Empty Profile")); // Add an empty profile entry for the alignment
+                            profile.IsSubItemSelected = false; // Update the IsSubItemSelected property                               
+                            profileData.IsSubItemSelected = false;
                         }
                     }
+                    if  (allAlignmentData[alignment.Name].IsProfileSelected == false)
+                    {
+                        profileRb.Add(new TypedValue((int)DxfCode.Text, "Empty Profile")); // Add an empty profile entry for the alignment                              
+                    }                   
+                    
                 }
+
                 Xrecord alignmentXrec = new Xrecord // Create or update the registry entry for alignments
                 {
                     Data = alignmentRb
@@ -1576,6 +1344,9 @@ namespace Infrakit.Windows
                 transaction.Commit();
             }
         }
+
+
+
 
         private void FillAlignmentTreeViewValueFromDictionary(DBDictionary customDictionary, Transaction transaction, string alignmentXrecordKey, string profileXrecordKey, TreeView treeView)
         {
@@ -1600,11 +1371,20 @@ namespace Infrakit.Windows
                     ListViewItemModel alignmentItem = treeView.Items.Cast<ListViewItemModel>().FirstOrDefault(item => item.Name == alignmentName);     // Find the alignment in the tree view
                     if (alignmentItem != null)
                     {
-                        alignmentItem.IsSelected = true; // Select the alignment                        
+                        alignmentItem.IsSelected = true; // Select the alignment  
+                        allAlignmentData[alignmentName].IsAlignmentSelected = true;
+
                         ProfileModel profile = alignmentItem.Profiles.FirstOrDefault(p => p.Name == profileName); // Find the profile in the alignment's profiles
                         if (profile != null)
                         {
                             profile.IsSubItemSelected = true; // Select the profile
+                            allAlignmentData[alignmentName].IsProfileSelected = true;    
+                            // Find and update the profile in allAlignmentData
+                            var profileData = allAlignmentData[alignmentName].ProfileNames.FirstOrDefault(p => p.Name == profileName);
+                            if (profileData != null)
+                            {
+                                profileData.IsSubItemSelected = true; // Update the IsSubItemSelected property
+                            }
 
                         }
 
@@ -1624,11 +1404,13 @@ namespace Infrakit.Windows
 
         private void ValiPinnad_Click(object sender, RoutedEventArgs e)
         {
+            ValitudPinnadNähtavad.IsChecked = false;
             SelectAndAddToTreeView<Autodesk.Civil.DatabaseServices.TinSurface>("AECC_TIN_SURFACE", SurfaceTreeView);
         }
 
         private void ValiTeljed_Click(object sender, RoutedEventArgs e)
-        {
+        {            
+            ValitudTeljedNähtavad.IsChecked = false;
             SelectAndAddToTreeView<Autodesk.Civil.DatabaseServices.TinSurface>("AECC_ALIGNMENT", AlignmentTreeView);
         }
 
@@ -1719,85 +1501,34 @@ namespace Infrakit.Windows
             }
         }
 
-
         private void ValitudPinnadNähtavad_Checked(object sender, RoutedEventArgs e)
         {
-            HandleCheckedTreeView(SurfaceTreeView);
+            HandleCheckedTreeView(SurfaceTreeView,false);
         }
-
-        private void ValitudPinnadNähtavad_Unchecked(object sender, RoutedEventArgs e)
-        {
-            HandleUncheckedTreeView(SurfaceTreeView, allSurfaceNames);
-        }
-
-        private void HandleCheckedTreeView(TreeView treeView)
-        {
-            var itemsSource = treeView.ItemsSource as IList<ListViewItemModel>;
-            if (itemsSource == null) return;
-
-            for (int i = itemsSource.Count - 1; i >= 0; i--)
-            {
-                if (!itemsSource[i].IsSelected)
-                {
-                    itemsSource.RemoveAt(i);
-                }
-            }
-        }
-
-        private void HandleUncheckedTreeView(TreeView treeView, List<string> allItems)
-        {
-            var itemsSource = treeView.ItemsSource as IList<ListViewItemModel>;
-            if (itemsSource == null) return;
-
-            foreach (string name in allItems)
-            {
-                // Check if the item is not already in the collection
-                if (!itemsSource.Any(item => item.Name == name))
-                {
-                    // Create a new ListViewItemModel with the name
-                    var newItem = new ListViewItemModel { Name = name, IsSelected = false };
-
-                    // Add the new item to the collection
-                    itemsSource.Add(newItem);
-                }
-            }
-        }
-
         private void ValitudTeljedNähtavad_Checked(object sender, RoutedEventArgs e)
         {
-            //Teljed.SelectionChanged -= Teljed_SelectionChanged;
-            //HandleCheckedListBox(ValitudTeljedNähtavad, Teljed);
-            //Teljed.SelectionChanged += Teljed_SelectionChanged;
-            HandleCheckedAlignmentTreeView(AlignmentTreeView);
-        }
-        private void ValitudTeljedNähtavad_Unchecked(object sender, RoutedEventArgs e)
-        {
-            //Teljed.SelectionChanged -= Teljed_SelectionChanged;
-            //HandleUncheckedListBox(ValitudTeljedNähtavad, Teljed, allAlignmentNames);
-            //Teljed.SelectionChanged += Teljed_SelectionChanged;
 
-            HandleUncheckedAlignmentTreeView(AlignmentTreeView, allAlignmentData);
+            HandleCheckedTreeView(AlignmentTreeView,true);
         }
 
-
-        private void HandleCheckedAlignmentTreeView(TreeView treeView)
+        private void HandleCheckedTreeView(TreeView treeView, bool handleProfiles)
         {
-            var itemsSource = treeView.ItemsSource as IList<ListViewItemModel>;
-            if (itemsSource == null) return;
-
-            for (int i = itemsSource.Count - 1; i >= 0; i--)
+            if (treeView.ItemsSource is ObservableCollection<ListViewItemModel> itemsSource)
             {
-                if (!itemsSource[i].IsSelected)
+                for (int i = itemsSource.Count - 1; i >= 0; i--)
                 {
-                    itemsSource.RemoveAt(i);
+                    if (!itemsSource[i].IsSelected)
+                    {
+                        itemsSource.RemoveAt(i);
+                    }
+                    else if (handleProfiles)
+                    {
+                        HandleCheckedProfiles(itemsSource[i].Profiles);
+                    }
                 }
-                else
-                {
-                    HandleCheckedProfiles(itemsSource[i].Profiles);
-                }
-
             }
         }
+
         private void HandleCheckedProfiles(ObservableCollection<ProfileModel> profiles)
         {
             if (profiles == null) return;
@@ -1811,131 +1542,119 @@ namespace Infrakit.Windows
             }
         }
 
+        private void ValitudPinnadNähtavad_Unchecked(object sender, RoutedEventArgs e)
+        {
+            HandleUncheckedTreeView(SurfaceTreeView, allSurfaceNames);
+        }
 
-        //private void HandleUncheckedAlignmentTreeView(TreeView treeView, Dictionary<string, List<string>> allAlignmentData)
-        //{
-        //    var rootItems = treeView.ItemsSource as IList<ListViewItemModel>;
-        //    if (rootItems == null) return;
+        private void ValitudTeljedNähtavad_Unchecked(object sender, RoutedEventArgs e)
+        {
+            HandleUncheckedAlignmentTreeView(AlignmentTreeView, allAlignmentData);
+        }
 
-        //    foreach (var alignmentName in allAlignmentData.Keys)
-        //    {
-        //        // Check if the alignment is already in the collection
-        //        var existingAlignmentItem = rootItems.FirstOrDefault(item => item.Name == alignmentName);
 
-        //        if (existingAlignmentItem == null)
-        //        {
-        //            // Alignment is not in the collection, so create a new one
-        //            var newAlignmentItem = new ListViewItemModel
-        //            {
-        //                Name = alignmentName,
-        //                IsSelected = false,
-        //                Profiles = new ObservableCollection<ProfileModel>()
-        //            };
+        private void HandleUncheckedTreeView(TreeView treeView, List<string> allItems)
+        {
+            if (treeView.ItemsSource is ObservableCollection<ListViewItemModel> itemsSource)
+            {
+                foreach (string name in allItems)
+                {
+                    // Check if the alignment already exists in itemsSource
+                    bool Exists = itemsSource.Any(item => item.Name == name);
 
-        //            // Add profiles associated with the alignment
-        //            foreach (string profileName in allAlignmentData[alignmentName])
-        //            {
-        //                newAlignmentItem.Profiles.Add(new ProfileModel { Name = profileName });
-        //            }
+                    // Check if the item is not already in the collection
+                    if (!Exists)
+                    {
+                        // Create a new ListViewItemModel with the name
+                        var newItem = new ListViewItemModel { Name = name, IsSelected = false };
 
-        //            // Add the new alignment item to the collection
-        //            rootItems.Add(newAlignmentItem);
-        //        }
-        //        else
-        //        {
-        //            // Alignment is already in the collection, so check profiles
-        //            foreach (string profileName in allAlignmentData[alignmentName])
-        //            {
-        //                if (!existingAlignmentItem.Profiles.Any(profile => profile.Name == profileName))
-        //                {
-        //                    // Add missing profile to the existing alignment item
-        //                    existingAlignmentItem.Profiles.Add(new ProfileModel { Name = profileName });
-        //                }
-        //            }
-        //        }
-        //    }
-        //}
+                        // Add the new item to the collection
+                        itemsSource.Add(newItem);
+                    }
+                }
+            }
+        }
         private void HandleUncheckedAlignmentTreeView(TreeView treeView, Dictionary<string, SelectedAlignmentProfile> allAlignmentData)
         {
-            var rootItems = treeView.ItemsSource as IList<ListViewItemModel>;
-            if (rootItems == null) return;
-
-            foreach (var alignmentData in allAlignmentData)
+            if (treeView.ItemsSource is ObservableCollection<ListViewItemModel> itemsSource)
             {
-                // Check if the alignment is already in the collection
-                var existingAlignmentItem = rootItems.FirstOrDefault(item => item.Name == alignmentData.Key);
-
-                if (existingAlignmentItem == null)
+                foreach (var alignmentName in allAlignmentData)
                 {
-                    // Alignment is not in the collection, so create a new one
-                    var newAlignmentItem = new ListViewItemModel
-                    {
-                        Name = alignmentData.Key,
-                        IsSelected = false,
-                        Profiles = new ObservableCollection<ProfileModel>()
-                    };
+                    // Check if the alignment already exists in itemsSource
+                    bool Exists = itemsSource.Any(item => item.Name == alignmentName.Value.AlignmentName);
 
-                    // Add profiles associated with the alignment
-                    foreach (string profileName in alignmentData.Value.ProfileNames)
+                    if (!Exists)
                     {
-                        newAlignmentItem.Profiles.Add(new ProfileModel { Name = profileName });
-                    }
+                        // Create a new alignment item if not found
+                        var alignmentItem = new ListViewItemModel { Name = alignmentName.Value.AlignmentName, IsSelected = false, Profiles = new ObservableCollection<ProfileModel>() };
 
-                    // Add the new alignment item to the collection
-                    rootItems.Add(newAlignmentItem);
-                }
-                else
-                {
-                    // Alignment is already in the collection, so check profiles
-                    foreach (string profileName in alignmentData.Value.ProfileNames)
-                    {
-                        if (!existingAlignmentItem.Profiles.Any(profile => profile.Name == profileName))
+                        // Add profiles associated with the alignment
+                        //foreach (string profileName in alignmentName.Value.ProfileNames)
+                        foreach (var profileModel in alignmentName.Value.ProfileNames)
                         {
-                            // Add missing profile to the existing alignment item
-                            existingAlignmentItem.Profiles.Add(new ProfileModel { Name = profileName });
+                            // Add profile only if it doesn't already exist
+                            if (!alignmentItem.Profiles.Any(profile => profile.Name == profileModel.Name))
+                            {
+                                alignmentItem.Profiles.Add(new ProfileModel { Name = profileModel.Name});
+                            }
+                        }
+                        // Add the new alignment item to the collection
+                        itemsSource.Add(alignmentItem);
+                    }
+                    else
+                    {
+                        // Get the existing alignment item
+                        var existingAlignmentItem = itemsSource.First(item => item.Name == alignmentName.Value.AlignmentName);
+
+                        // Add missing profiles to the existing alignment item
+                        //foreach (string profileName in alignmentName.Value.ProfileNames)
+                        foreach (var profileModel in alignmentName.Value.ProfileNames)
+                        {
+                            if (!existingAlignmentItem.Profiles.Any(profile => profile.Name == profileModel.Name))
+                            {
+                                existingAlignmentItem.Profiles.Add(new ProfileModel { Name = profileModel.Name });
+                            }
                         }
                     }
                 }
             }
         }
 
-
-
-
-
-
         private void OtsiPinnad_TextChanged(object sender, EventArgs e)
         {
+            ValitudPinnadNähtavad.IsChecked = false;
             FilterTreeView(SurfaceTreeView, OtsiPinnad, SelectedPinnad, allSurfaceNames);
         }
 
-        //private void OtsiTeljed_TextChanged(object sender, EventArgs e)
-        //{
-        //    //FilterTreeView(AlignmentTreeView, OtsiTeljed, SelectedTeljed, allAlignmentNames);
-        //    //FilterAlignmentTreeView(AlignmentTreeView, OtsiPinnad, SelectedPinnad, allAlignmentNames);
+        private void OtsiTeljed_TextChanged(object sender, EventArgs e)
+        {
+            ValitudTeljedNähtavad.IsChecked = false;
+            FilterAlignmentTreeView(AlignmentTreeView, OtsiTeljed, allAlignmentData);
+        }
 
-
-        //    //FilterAlignmentTreeView(AlignmentTreeView, OtsiTeljed, SelectedTeljed, allAlignmentData);
-        //    FilterAlignmentTreeView(AlignmentTreeView, OtsiTeljed, allAlignmentData);
-        //}        
-
+      
         private void FilterTreeView(TreeView treeView, TextBox textBox, List<string> selectedList, List<string> allItems)
         {
-            var itemsSource = treeView.ItemsSource as IList<ListViewItemModel>;
-            if (itemsSource == null) return;
+            if (allItems == null) return;
 
             string userInput = textBox.Text.ToLower(); // Convert user input to lower case for case-insensitive comparison
 
-            // Create a new list to hold filtered items
-            var filteredItems = new List<ListViewItemModel>();
+            // Assuming the original ItemsSource is an ObservableCollection<ListViewItemModel>
+            if (!(treeView.ItemsSource is ObservableCollection<ListViewItemModel> itemsSource))
+            {
+                // If ItemsSource is not already set as ObservableCollection, handle this case appropriately
+                return;
+            }
+
+            // Clear existing items (if any) from the ObservableCollection
+            itemsSource.Clear();
 
             foreach (string item in allItems)
             {
                 if (item.ToLower().Contains(userInput)) // If the item contains the user input substring
-                //if (Regex.IsMatch(item, userInput, RegexOptions.IgnoreCase)) // If the item matches the pattern
                 {
                     var newItem = new ListViewItemModel { Name = item, IsSelected = false }; // Create a new ListViewItemModel
-                    filteredItems.Add(newItem); // Add the new item to the filtered list
+                    itemsSource.Add(newItem); // Add the new item to the ObservableCollection
 
                     if (selectedList != null)
                     {
@@ -1951,696 +1670,53 @@ namespace Infrakit.Windows
                     }
                 }
             }
-            treeView.ItemsSource = filteredItems;// Update the ItemsSource with filtered items
         }
-
-        //private void FilterAlignmentTreeView(TreeView treeView, TextBox textBox, List<string> selectedList, Dictionary<string, List<string>> allAlignmentData)
-        //{
-        //    var itemsSource = treeView.ItemsSource as IList<ListViewItemModel>;
-        //    if (itemsSource == null) return;
-
-        //    string userInput = textBox.Text.ToLower(); // Convert user input to lower case for case-insensitive comparison
-
-        //    // Create a new list to hold filtered items
-        //    var filteredItems = new List<ListViewItemModel>();
-
-        //    foreach (var alignmentEntry in allAlignmentData)
-        //    {
-        //        var alignmentName = alignmentEntry.Key;
-        //        var profileNames = alignmentEntry.Value;
-
-        //        if (alignmentName.ToLower().Contains(userInput)) // If the alignment name contains the user input substring
-        //        {
-        //            var newAlignmentItem = new ListViewItemModel
-        //            {
-        //                Name = alignmentName,
-        //                IsSelected = false,
-        //                Profiles = new ObservableCollection<ProfileModel>()
-        //            };
-
-        //            // Add profiles associated with the alignment
-        //            foreach (string profileName in profileNames)
-        //            {
-        //                newAlignmentItem.Profiles.Add(new ProfileModel { Name = profileName });
-        //            }
-
-        //            filteredItems.Add(newAlignmentItem);
-
-        //            if (selectedList != null)
-        //            {
-        //                // Check if the alignment is selected
-        //                foreach (string selectedItem in selectedList)
-        //                {
-        //                    if (selectedItem.ToLower() == alignmentName.ToLower())
-        //                    {
-        //                        newAlignmentItem.IsSelected = true; // Select the alignment
-        //                        break; // Once item is found, no need to continue searching
-        //                    }
-        //                }
-        //            }
-        //        }
-        //        else
-        //        {
-        //            // Check if any profile name contains the user input substring
-        //            var newProfiles = new ObservableCollection<ProfileModel>();
-        //            foreach (string profileName in profileNames)
-        //            {
-        //                if (profileName.ToLower().Contains(userInput))
-        //                {
-        //                    newProfiles.Add(new ProfileModel { Name = profileName });
-        //                }
-        //            }
-
-        //            if (newProfiles.Count > 0)
-        //            {
-        //                var newAlignmentItem = new ListViewItemModel
-        //                {
-        //                    Name = alignmentName,
-        //                    IsSelected = false,
-        //                    Profiles = newProfiles
-        //                };
-
-        //                filteredItems.Add(newAlignmentItem);
-
-        //                if (selectedList != null)
-        //                {
-        //                    // Check if the alignment is selected
-        //                    foreach (string selectedItem in selectedList)
-        //                    {
-        //                        if (selectedItem.ToLower() == alignmentName.ToLower())
-        //                        {
-        //                            newAlignmentItem.IsSelected = true; // Select the alignment
-        //                            break; // Once item is found, no need to continue searching
-        //                        }
-        //                    }
-        //                }
-        //            }
-        //        }
-        //    }
-
-        //    treeView.ItemsSource = filteredItems; // Update the ItemsSource with filtered items
-        //}
-
-        //private void FilterAlignmentTreeView(TreeView treeView, TextBox textBox, Dictionary<string, SelectedAlignmentProfile> allAlignmentData)
-        //{
-        //    var itemsSource = treeView.ItemsSource as IList<ListViewItemModel>;
-        //    if (itemsSource == null) return;
-
-        //    string userInput = textBox.Text.ToLower(); // Convert user input to lower case for case-insensitive comparison
-
-        //    // Create a new list to hold filtered items
-        //    var filteredItems = new List<ListViewItemModel>();
-
-        //    foreach (var alignmentEntry in allAlignmentData)
-        //    {
-        //        var alignmentName = alignmentEntry.Key;
-        //        var selectedAlignmentProfile = alignmentEntry.Value;
-
-        //        if (alignmentName.ToLower().Contains(userInput)) // If the alignment name contains the user input substring
-        //        {
-        //            var newAlignmentItem = new ListViewItemModel
-        //            {
-        //                Name = alignmentName,
-        //                IsSelected = false,
-        //                Profiles = new ObservableCollection<ProfileModel>()
-        //            };
-
-        //            // Add profiles associated with the alignment
-        //            foreach (string profileName in selectedAlignmentProfile.ProfileNames)
-        //            {
-        //                newAlignmentItem.Profiles.Add(new ProfileModel { Name = profileName });
-        //            }
-
-        //            filteredItems.Add(newAlignmentItem);
-
-        //            // Check if any profile is selected for the alignment
-        //            if (!string.IsNullOrEmpty(selectedAlignmentProfile.SelectedProfileName))
-        //            {
-        //                newAlignmentItem.IsSelected = true; // Select the alignment
-        //            }
-        //        }
-        //        else
-        //        {
-        //            // Check if any profile name contains the user input substring
-        //            var newProfiles = new ObservableCollection<ProfileModel>();
-        //            foreach (string profileName in selectedAlignmentProfile.ProfileNames)
-        //            {
-        //                if (profileName.ToLower().Contains(userInput))
-        //                {
-        //                    newProfiles.Add(new ProfileModel { Name = profileName });
-        //                }
-        //            }
-
-        //            if (newProfiles.Count > 0)
-        //            {
-        //                var newAlignmentItem = new ListViewItemModel
-        //                {
-        //                    Name = alignmentName,
-        //                    IsSelected = false,
-        //                    Profiles = newProfiles
-        //                };
-
-        //                filteredItems.Add(newAlignmentItem);
-
-        //                // Check if any profile is selected for the alignment
-        //                if (!string.IsNullOrEmpty(selectedAlignmentProfile.SelectedProfileName))
-        //                {
-        //                    newAlignmentItem.IsSelected = true; // Select the alignment
-        //                }
-        //            }
-        //        }
-        //    }
-
-        //    treeView.ItemsSource = filteredItems; // Update the ItemsSource with filtered items
-        //}
-        //private void FilterAlignmentTreeView(TreeView treeView, TextBox textBox, Dictionary<string, SelectedAlignmentProfile> allAlignmentData)
-        //{
-        //    var itemsSource = treeView.ItemsSource as IList<ListViewItemModel>;
-        //    if (itemsSource == null) return;
-
-        //    string userInput = textBox.Text.ToLower(); // Convert user input to lower case for case-insensitive comparison
-
-        //     Create a new list to hold filtered items
-        //    var filteredItems = new List<ListViewItemModel>();
-
-        //    foreach (var alignmentEntry in allAlignmentData)
-        //    {
-        //        var alignmentName = alignmentEntry.Key;
-        //        var selectedAlignmentProfile = alignmentEntry.Value;
-
-        //        if (alignmentName.ToLower().Contains(userInput)) // If the alignment name contains the user input substring
-        //        {
-        //            var newAlignmentItem = new ListViewItemModel
-        //            {
-        //                Name = alignmentName,
-        //                IsSelected = selectedAlignmentProfile.IsAlignmentSelected, // Update IsSelected based on selection
-        //                Profiles = new ObservableCollection<ProfileModel>()
-        //            };
-
-        //             Add profiles associated with the alignment
-        //            foreach (string profileName in selectedAlignmentProfile.ProfileNames)
-        //            {
-        //                newAlignmentItem.Profiles.Add(new ProfileModel { Name = profileName });
-        //            }
-
-        //            filteredItems.Add(newAlignmentItem);
-        //        }
-        //        else
-        //        {
-        //             Check if any profile name contains the user input substring
-        //            var newProfiles = new ObservableCollection<ProfileModel>();
-        //            foreach (string profileName in selectedAlignmentProfile.ProfileNames)
-        //            {
-        //                if (profileName.ToLower().Contains(userInput))
-        //                {
-        //                    newProfiles.Add(new ProfileModel { Name = profileName });
-        //                }
-        //            }
-
-        //            if (newProfiles.Count > 0)
-        //            {
-        //                var newAlignmentItem = new ListViewItemModel
-        //                {
-        //                    Name = alignmentName,
-        //                    IsSelected = selectedAlignmentProfile.IsAlignmentSelected, // Update IsSelected based on selection
-        //                    Profiles = newProfiles
-        //                };
-
-        //                filteredItems.Add(newAlignmentItem);
-        //            }
-        //        }
-        //    }
-
-        //    treeView.ItemsSource = filteredItems; // Update the ItemsSource with filtered items
-        //}
-
-        //private void FilterAlignmentTreeView(TreeView treeView, TextBox textBox, Dictionary<string, SelectedAlignmentProfile> allAlignmentData)
-        //{
-        //    var itemsSource = treeView.ItemsSource as IList<ListViewItemModel>;
-        //    if (itemsSource == null) return;
-
-        //    string userInput = textBox.Text.ToLower(); // Convert user input to lower case for case-insensitive comparison
-
-        //    // Create a new list to hold filtered items
-        //    var filteredItems = new List<ListViewItemModel>();
-
-        //    // Create a dictionary to store the selection state of each item before filtering
-        //    var selectionStateDict = new Dictionary<string, bool>();
-
-        //    foreach (var item in itemsSource)
-        //    {
-        //        selectionStateDict[item.Name] = item.IsSelected; // Store the selection state of each item
-        //    }
-
-        //    foreach (var alignmentEntry in allAlignmentData)
-        //    {
-        //        var alignmentName = alignmentEntry.Key;
-        //        var selectedAlignmentProfile = alignmentEntry.Value;
-
-        //        if (alignmentName.ToLower().Contains(userInput)) // If the alignment name contains the user input substring
-        //        {
-        //            var newAlignmentItem = new ListViewItemModel
-        //            {
-        //                Name = alignmentName,
-        //                IsSelected = selectionStateDict.ContainsKey(alignmentName) ? selectionStateDict[alignmentName] : false, // Restore the selection state
-        //                Profiles = new ObservableCollection<ProfileModel>()
-        //            };
-
-        //            // Add profiles associated with the alignment
-        //            foreach (string profileName in selectedAlignmentProfile.ProfileNames)
-        //            {
-        //                newAlignmentItem.Profiles.Add(new ProfileModel { Name = profileName });
-        //            }
-
-        //            filteredItems.Add(newAlignmentItem);
-        //        }
-        //        else
-        //        {
-        //            // Check if any profile name contains the user input substring
-        //            var newProfiles = new ObservableCollection<ProfileModel>();
-        //            foreach (string profileName in selectedAlignmentProfile.ProfileNames)
-        //            {
-        //                if (profileName.ToLower().Contains(userInput))
-        //                {
-        //                    newProfiles.Add(new ProfileModel { Name = profileName });
-        //                }
-        //            }
-
-        //            if (newProfiles.Count > 0)
-        //            {
-        //                var newAlignmentItem = new ListViewItemModel
-        //                {
-        //                    Name = alignmentName,
-        //                    IsSelected = selectionStateDict.ContainsKey(alignmentName) ? selectionStateDict[alignmentName] : false, // Restore the selection state
-        //                    Profiles = newProfiles
-        //                };
-
-        //                filteredItems.Add(newAlignmentItem);
-        //            }
-        //        }
-        //    }
-
-        //    treeView.ItemsSource = filteredItems; // Update the ItemsSource with filtered items
-        //}
-
         private void FilterAlignmentTreeView(TreeView treeView, TextBox textBox, Dictionary<string, SelectedAlignmentProfile> allAlignmentData)
         {
-            var itemsSource = treeView.ItemsSource as IList<ListViewItemModel>;
-            if (itemsSource == null) return;
+            if (allAlignmentData == null) return;
 
             string userInput = textBox.Text.ToLower(); // Convert user input to lower case for case-insensitive comparison
 
-            // Create a new list to hold filtered items
-            var filteredItems = new List<ListViewItemModel>();
-
-            // Create dictionaries to store the selection state of alignments and profiles before filtering
-            var alignmentSelectionStateDict = new Dictionary<string, bool>();
-            var profileSelectionStateDict = new Dictionary<string, Dictionary<string, bool>>();
-
-            foreach (var item in itemsSource)
+            // Assuming the original ItemsSource is an ObservableCollection<ListViewItemModel>
+            if (!(treeView.ItemsSource is ObservableCollection<ListViewItemModel> itemsSource))
             {
-                alignmentSelectionStateDict[item.Name] = item.IsSelected; // Store the selection state of each alignment
-                if (!profileSelectionStateDict.ContainsKey(item.Name))
-                {
-                    profileSelectionStateDict[item.Name] = new Dictionary<string, bool>();
-                }
-                foreach (var profile in item.Profiles)
-                {
-                    profileSelectionStateDict[item.Name][profile.Name] = profile.IsSubItemSelected; // Store the selection state of each profile for the alignment
-                }
+                // If ItemsSource is not already set as ObservableCollection, handle this case appropriately
+                return;
             }
 
-            foreach (var alignmentEntry in allAlignmentData)
-            {
-                var alignmentName = alignmentEntry.Key;
-                var selectedAlignmentProfile = alignmentEntry.Value;
+            // Clear existing items (if any) from the ObservableCollection
+            itemsSource.Clear();
 
-                if (alignmentName.ToLower().Contains(userInput)) // If the alignment name contains the user input substring
+            foreach (var alignmentData in allAlignmentData)
+            {
+                if (alignmentData.Key.ToLower().Contains(userInput)) // If the alignment name contains the user input substring
                 {
                     var newAlignmentItem = new ListViewItemModel
                     {
-                        Name = alignmentName,
-                        IsSelected = alignmentSelectionStateDict.ContainsKey(alignmentName) ? alignmentSelectionStateDict[alignmentName] : false, // Restore the selection state of alignment
+                        Name = alignmentData.Key,
+                        IsSelected = alignmentData.Value.IsAlignmentSelected, // Use the stored selected state from allAlignmentData
                         Profiles = new ObservableCollection<ProfileModel>()
-                    };
+                    }; // Create a new ListViewItemModel for alignment
 
                     // Add profiles associated with the alignment
-                    foreach (string profileName in selectedAlignmentProfile.ProfileNames)
+                    //foreach (string profileName in alignmentData.Value.ProfileNames)
+                    foreach (var profileModel in alignmentData.Value.ProfileNames)
                     {
-                        var profileModel = new ProfileModel { Name = profileName };
-                        if (profileSelectionStateDict.ContainsKey(alignmentName) && profileSelectionStateDict[alignmentName].ContainsKey(profileName))
+                        // Add profile only if it doesn't already exist
+                        if (!newAlignmentItem.Profiles.Any(profile => profile.Name.ToLower() == profileModel.Name.ToLower()))
                         {
-                            profileModel.IsSubItemSelected = profileSelectionStateDict[alignmentName][profileName]; // Restore the selection state of profile
-                        }
-                        newAlignmentItem.Profiles.Add(profileModel);
-                    }
-
-                    filteredItems.Add(newAlignmentItem);
-                }
-                else
-                {
-                    // Check if any profile name contains the user input substring
-                    var newProfiles = new ObservableCollection<ProfileModel>();
-                    foreach (string profileName in selectedAlignmentProfile.ProfileNames)
-                    {
-                        if (profileName.ToLower().Contains(userInput))
-                        {
-                            var profileModel = new ProfileModel { Name = profileName };
-                            if (profileSelectionStateDict.ContainsKey(alignmentName) && profileSelectionStateDict[alignmentName].ContainsKey(profileName))
+                            newAlignmentItem.Profiles.Add(new ProfileModel
                             {
-                                profileModel.IsSubItemSelected = profileSelectionStateDict[alignmentName][profileName]; // Restore the selection state of profile
-                            }
-                            newProfiles.Add(profileModel);
+                                Name = profileModel.Name,
+                                IsSubItemSelected = profileModel.IsSubItemSelected // Set IsSelected based on allAlignmentData
+                            });
                         }
                     }
-
-                    if (newProfiles.Count > 0)
-                    {
-                        var newAlignmentItem = new ListViewItemModel
-                        {
-                            Name = alignmentName,
-                            IsSelected = alignmentSelectionStateDict.ContainsKey(alignmentName) ? alignmentSelectionStateDict[alignmentName] : false, // Restore the selection state of alignment
-                            Profiles = newProfiles
-                        };
-
-                        filteredItems.Add(newAlignmentItem);
-                    }
+                    // Add the new alignment item to the ObservableCollection
+                    itemsSource.Add(newAlignmentItem);
                 }
-            }
-
-            treeView.ItemsSource = filteredItems; // Update the ItemsSource with filtered items
-        }
-
-
-        private void BtnLaePinnadUlesse(object sender, RoutedEventArgs e)
-        {
-            Document doc = AcAp.DocumentManager.MdiActiveDocument;
-            Database db = doc.Database;
-            CivilDocument civDoc = CivilApplication.ActiveDocument;
-            Stopwatch stopwatch = Stopwatch.StartNew();  // Start the stopwatch
-            TimeSpan elapsedTime;
-            try
-            {
-                if (string.IsNullOrEmpty(Projektid.Text) || string.IsNullOrEmpty(PindadeKaustad.Text))
-                {
-                    if (string.IsNullOrEmpty(Projektid.Text))  // Show error message for empty Kasutajanimi.Text
-                    {
-                        MessageBox.Show("Project is empty!", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                    }
-                    if (string.IsNullOrEmpty(PindadeKaustad.Text)) // Show error message for empty Parool.Text
-                    {
-                        MessageBox.Show("Surface folder is empty!", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                    }
-                }
-                else
-                {
-                    foreach (ListViewItemModel surfaceItem in SurfaceItems)
-                    {
-                        if (surfaceItem.IsSelected)
-                        {
-                            accessToken = GetAccessToken();
-
-                            // Find the surface with the given name
-                            ObjectId surfaceId = ObjectId.Null;
-                            using (Transaction tr = db.TransactionManager.StartTransaction())
-                            {
-                                TinSurface surface = tr.GetObject(GetSurfaceIdByName(civDoc, surfaceItem.Name), OpenMode.ForRead) as TinSurface;
-                                if (surface != null)
-                                {
-                                    surfaceId = surface.Id;
-                                }
-                                tr.Commit();
-                            }
-
-                            using (Transaction tr = db.TransactionManager.StartTransaction())
-                            {
-                                TinSurface surface = tr.GetObject(surfaceId, OpenMode.ForRead) as TinSurface;
-
-                                if (surface == null)
-                                {
-                                    AcAp.DocumentManager.MdiActiveDocument.Editor.WriteMessage("Failed to open surface!");
-                                    return;
-                                }
-                                string filePath = CreateAndSaveSurfaceLandXMLToFile(surface, surfaceItem.Name);
-                                if (filePath != null)
-                                {
-                                    UploadFile(filePath, surfaceItem.Name, SurfaceFolderNameUUidPairs[PindadeKaustad.SelectedValue.ToString()]);
-                                }
-                                tr.Commit();
-                            }
-                        }
-                    }
-                    elapsedTime = stopwatch.Elapsed;  // Get the elapsed time as a TimeSpan                 
-                    MessageBox.Show($"Upload complete. It took {elapsedTime.ToString(@"mm\:ss")} to complete.");
-                }
-            }
-
-            catch (WebException webEx)
-            {
-                HandleWebException(webEx);
-            }
-            catch (Autodesk.AutoCAD.Runtime.Exception ex)
-            {
-                MessageBox.Show("Exception: " + ex.Message);
-            }
-            catch (System.Exception ex)
-            {
-                MessageBox.Show("Exception: " + ex.Message);
             }
         }
-
-        private void BtnLaePinnadUlesseUus(object sender, RoutedEventArgs e)
-        {
-            Document doc = AcAp.DocumentManager.MdiActiveDocument;
-            Editor ed = doc.Editor;
-            Database db = doc.Database;
-            CivilDocument civDoc = CivilApplication.ActiveDocument;
-            Stopwatch stopwatch = Stopwatch.StartNew();  // Start the stopwatch
-            TimeSpan elapsedTime;
-            try
-            {
-                if (string.IsNullOrEmpty(Projektid.Text) || string.IsNullOrEmpty(PindadeKaustad.Text))
-                {
-                    if (string.IsNullOrEmpty(Projektid.Text))  // Show error message for empty Kasutajanimi.Text
-                    {
-                        MessageBox.Show("Project is empty!", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                    }
-                    if (string.IsNullOrEmpty(PindadeKaustad.Text)) // Show error message for empty Parool.Text
-                    {
-                        MessageBox.Show("Surface folder is empty!", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                    }
-                }
-                else
-                {
-                    ed.Command("-LANDXMLOUT", "1.2", "AutomaticLandXML.xml");
-                    string exportFilePath = System.IO.Path.GetDirectoryName(db.Filename) + "\\AutomaticLandXML.xml";
-                    List<string> surfacesToKeep = new List<string>();
-                    foreach (ListViewItemModel surfaceItem in SurfaceItems)
-                    {
-                        if (surfaceItem.IsSelected)
-                        {
-                            surfacesToKeep.Add(surfaceItem.Name);
-
-                        }
-                    }
-                    SplitLandXMLSurfaces(exportFilePath, surfacesToKeep);
-                    foreach (ListViewItemModel surfaceItem in SurfaceItems)
-                    {
-                        if (surfaceItem.IsSelected)
-                        {
-                            string filePath = System.IO.Path.GetDirectoryName(db.Filename) + "\\" + surfaceItem.Name + ".xml";
-                            if (PinnaKaust.Text != "")
-                            {
-                                filePath = PinnaKaust.Text + "\\" + surfaceItem.Name + ".xml";
-                            }
-
-
-                            accessToken = GetAccessToken();
-                            UploadFile(filePath, surfaceItem.Name, SurfaceFolderNameUUidPairs[PindadeKaustad.SelectedValue.ToString()]);
-                        }
-                    }
-                    elapsedTime = stopwatch.Elapsed;  // Get the elapsed time as a TimeSpan                 
-                    MessageBox.Show($"Upload complete. It took {elapsedTime.ToString(@"mm\:ss")} to complete.");
-                }
-            }
-
-            catch (WebException webEx)
-            {
-                HandleWebException(webEx);
-            }
-            catch (Autodesk.AutoCAD.Runtime.Exception ex)
-            {
-                MessageBox.Show("Exception: " + ex.Message);
-            }
-            catch (System.Exception ex)
-            {
-                MessageBox.Show("Exception: " + ex.Message);
-            }
-        }
-
-
-        private void BtnLaeTeljedUlesse(object sender, RoutedEventArgs e)
-        {
-            Document doc = AcAp.DocumentManager.MdiActiveDocument;
-            Database db = doc.Database;
-            CivilDocument civDoc = CivilApplication.ActiveDocument;
-            Stopwatch stopwatch = Stopwatch.StartNew();  // Start the stopwatch
-            TimeSpan elapsedTime;
-
-            try
-            {
-                if (string.IsNullOrEmpty(Projektid.Text) || string.IsNullOrEmpty(TelgedeKaustad.Text))
-                {
-                    if (string.IsNullOrEmpty(Projektid.Text))  // Show error message for empty Projektid.Text
-                    {
-                        MessageBox.Show("Project is empty!", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                    }
-                    if (string.IsNullOrEmpty(TelgedeKaustad.Text)) // Show error message for empty TelgedeKaustad.Text
-                    {
-                        MessageBox.Show("Alignment folder is empty!", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                    }
-                }
-                else
-                {
-                    foreach (ListViewItemModel alignmentItem in AlignmentItems)
-                    {
-                        if (alignmentItem.IsSelected)
-                        {
-                            accessToken = GetAccessToken();
-                            // Find the alignment with the given name
-                            ObjectId alignmentId = ObjectId.Null;
-                            using (Transaction tr = db.TransactionManager.StartTransaction())
-                            {
-                                Alignment alignment = tr.GetObject(GetAlignmentIdByName(civDoc, alignmentItem.Name), OpenMode.ForRead) as Alignment;
-                                if (alignment != null)
-                                {
-                                    alignmentId = alignment.Id;
-                                }
-                                tr.Commit();
-                            }
-
-                            using (Transaction tr = db.TransactionManager.StartTransaction())
-                            {
-                                Alignment alignment = tr.GetObject(alignmentId, OpenMode.ForRead) as Alignment;
-
-                                if (alignment == null)
-                                {
-                                    AcAp.DocumentManager.MdiActiveDocument.Editor.WriteMessage("Failed to open alignment!");
-                                    return;
-                                }
-                                ProfileModel selectedProfile = alignmentItem.Profiles.FirstOrDefault(p => p.IsSubItemSelected);    // Assuming there's only one profile selected for each alignment                           
-                                string profileName = selectedProfile == null ? "" : selectedProfile.Name;
-                                string filePath = CreateAndSaveAlignmentLandXMLToFile(alignment, alignment.Name, profileName);
-
-                                if (filePath != null)
-                                {
-                                    UploadFile(filePath, alignment.Name, AlignmentFolderNameUUidPairs[TelgedeKaustad.SelectedValue.ToString()]);
-                                }
-                                tr.Commit();
-                            }
-                        }
-                    }
-
-                    elapsedTime = stopwatch.Elapsed;  // Get the elapsed time as a TimeSpan
-                    MessageBox.Show($"Upload complete. It took {elapsedTime.ToString(@"mm\:ss")} to complete.");
-                }
-            }
-            catch (WebException webEx)
-            {
-                HandleWebException(webEx);
-            }
-            catch (Autodesk.AutoCAD.Runtime.Exception ex)
-            {
-                MessageBox.Show("Exception: " + ex.Message);
-            }
-            catch (System.Exception ex)
-            {
-                MessageBox.Show("Exception: " + ex.Message);
-            }
-        }
-
-
-
-        private void BtnLaeTeljedUlesseUus(object sender, RoutedEventArgs e)
-
-        {
-            Document doc = AcAp.DocumentManager.MdiActiveDocument;
-            Editor ed = doc.Editor;
-            Database db = doc.Database;
-            Stopwatch stopwatch = Stopwatch.StartNew();  // Start the stopwatch
-            TimeSpan elapsedTime;
-
-            try
-            {
-                if (string.IsNullOrEmpty(Projektid.Text) || string.IsNullOrEmpty(TelgedeKaustad.Text))
-                {
-                    if (string.IsNullOrEmpty(Projektid.Text))  // Show error message for empty Projektid.Text
-                    {
-                        MessageBox.Show("Project is empty!", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                    }
-                    if (string.IsNullOrEmpty(TelgedeKaustad.Text)) // Show error message for empty TelgedeKaustad.Text
-                    {
-                        MessageBox.Show("Alignment folder is empty!", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                    }
-                }
-                else
-                {
-                    //await ed.CommandAsync("-LANDXMLOUT", "1.2", "AutomaticLandXML.xml");
-                    //await ExecuteAutoCADCommandsAsync();
-                    ed.Command("-LANDXMLOUT", "1.2", "AutomaticLandXML.xml");
-                    string exportFilePath = System.IO.Path.GetDirectoryName(db.Filename) + "\\AutomaticLandXML.xml";                    
-                    List<string> alignmentsToKeep = new List<string>();
-                    List<string> profilesToKeep = new List<string>();
-
-                    foreach (ListViewItemModel alignmentItem in AlignmentItems)
-                    {
-                        if (alignmentItem.IsSelected)
-                        {
-                            ProfileModel selectedProfile = alignmentItem.Profiles.FirstOrDefault(p => p.IsSubItemSelected);    // Assuming there's only one profile selected for each alignment                           
-                            string profileName = selectedProfile == null ? "" : selectedProfile.Name;
-                            alignmentsToKeep.Add(alignmentItem.Name);
-                            profilesToKeep.Add(selectedProfile == null ? "" : selectedProfile.Name);
-                        }
-                    }
-
-                    SplitLandXMLAlignments(exportFilePath, alignmentsToKeep, profilesToKeep);
-
-                    foreach (ListViewItemModel alignmentItem in AlignmentItems)
-                    {
-                        if (alignmentItem.IsSelected)
-                        {
-                            ProfileModel selectedProfile = alignmentItem.Profiles.FirstOrDefault(p => p.IsSubItemSelected);    // Assuming there's only one profile selected for each alignment                           
-                            string profileName = selectedProfile == null ? "" : selectedProfile.Name;
-                            string filePath = System.IO.Path.GetDirectoryName(db.Filename) + "\\" + alignmentItem.Name + ".xml";
-                            if (TeljeKaust.Text != "")
-                            {
-                                filePath = TeljeKaust.Text + "\\" + alignmentItem.Name + ".xml";
-                            }
-
-                            accessToken = GetAccessToken();
-                            UploadFile(filePath, alignmentItem.Name, AlignmentFolderNameUUidPairs[TelgedeKaustad.SelectedValue.ToString()]);
-                        }
-                    }
-
-                    elapsedTime = stopwatch.Elapsed;  // Get the elapsed time as a TimeSpan
-                    MessageBox.Show($"Upload complete. It took {elapsedTime.ToString(@"mm\:ss")} to complete.");
-
-                }
-
-            }
-            catch (WebException webEx)
-            {
-                HandleWebException(webEx);
-            }
-            catch (Autodesk.AutoCAD.Runtime.Exception ex)
-            {
-                MessageBox.Show("Exception: " + ex.Message);
-            }
-            catch (System.Exception ex)
-            {
-                MessageBox.Show("Exception: " + ex.Message);
-            }
-        }       
 
         public void SplitLandXMLSurfaces(string xmlfilename, List<string> surfacesToKeep)
         {
@@ -2666,10 +1742,7 @@ namespace Infrakit.Windows
             SplitNodes(xmldoc, xmlfilename, "Alignment", alignmentsToKeep, profilesToKeep, ed);
         }
 
-
-
-
-        private void SplitNodes(XmlDocument xmldoc, string xmlfilename, string tagName, List<string> alignmentsToKeep, List<string> profilesToKeep, Editor ed)
+        private void SplitNodes(XmlDocument xmldoc, string xmlfilename, string tagName, List<string> AlignmentsOrSurfacesToKeep, List<string> profilesToKeep, Editor ed)
         {
             XmlNamespaceManager nsmgr = new XmlNamespaceManager(xmldoc.NameTable);
             nsmgr.AddNamespace("LandXML", "http://www.landxml.org/schema/LandXML-1.2");
@@ -2704,16 +1777,27 @@ namespace Infrakit.Windows
 
             foreach (string nodeName in namelist)
             {
-                int index = alignmentsToKeep.IndexOf(nodeName);
-                if (index == -1)
-                    continue;
+                string currentNodeName = nodeName;
+                int index = AlignmentsOrSurfacesToKeep.IndexOf(currentNodeName);
 
-                string newfilename = path + nodeName + ".xml";
+                //if (index == -1)
+                //    continue;
+                if (index == -1)
+                {
+                    currentNodeName = nodeName.Replace('_', ' ');
+                    index = AlignmentsOrSurfacesToKeep.IndexOf(currentNodeName);
+                    if (index == -1)                    
+                        continue;                 
+                }
+
+
+
+                string newfilename = path + currentNodeName + ".xml";
                 if (tagName == "Alignment")
                 {
                     if (TeljeKaust.Text != "")
                     {
-                        newfilename = TeljeKaust.Text + "\\" + nodeName + ".xml";
+                        newfilename = TeljeKaust.Text + "\\" + currentNodeName + ".xml";
                     }
                 }
 
@@ -2721,7 +1805,7 @@ namespace Infrakit.Windows
                 {
                     if (PinnaKaust.Text != "")
                     {
-                        newfilename = PinnaKaust.Text + "\\" + nodeName + ".xml";
+                        newfilename = PinnaKaust.Text + "\\" + currentNodeName + ".xml";
                     }
                 }
 
@@ -2732,7 +1816,7 @@ namespace Infrakit.Windows
                 List<XmlNode> nodestoremove = new List<XmlNode>();
                 foreach (XmlNode node in nodes)
                 {
-                    if (node.Attributes["name"].Value != nodeName)
+                    if (node.Attributes["name"].Value != currentNodeName)
                     {
                         nodestoremove.Add(node);
                     }
@@ -2740,7 +1824,7 @@ namespace Infrakit.Windows
                     {
                         if (tagName == "Alignment")
                         {
-                            XmlNode alignmentNode = newdoc.SelectSingleNode($"//LandXML:Alignments/LandXML:Alignment[@name='{nodeName}']", nsmgr);
+                            XmlNode alignmentNode = newdoc.SelectSingleNode($"//LandXML:Alignments/LandXML:Alignment[@name='{currentNodeName}']", nsmgr);
                             if (alignmentNode != null)
                             {
                                 XmlNodeList profileNodes = alignmentNode.SelectNodes("LandXML:Profile", nsmgr);
@@ -2770,20 +1854,6 @@ namespace Infrakit.Windows
                 newdoc.Save(newfilename);
             }
         }
-
-        private ObjectId GetAlignmentIdByName(CivilDocument civDoc, string name)
-        {
-            foreach (ObjectId alignmentId in civDoc.GetAlignmentIds())
-            {
-                Alignment alignment = alignmentId.GetObject(OpenMode.ForRead) as Alignment;
-                if (alignment.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
-                {
-                    return alignmentId;
-                }
-            }
-            return ObjectId.Null;
-        }
-
 
         public static class StringCipher
         {
