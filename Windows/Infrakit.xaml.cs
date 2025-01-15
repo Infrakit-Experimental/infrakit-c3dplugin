@@ -923,9 +923,18 @@ namespace Infrakit.Windows
                 ProjectNameUUidPairs = new Dictionary<string, string>(); // Initialize the dictionary here          
                 foreach (var item in jsonArray)
                 {
-                    //Projektid.Items.Add((string)item["name"] + "|" + (string)item["uuid"]);
                     string name = (string)item["name"];
                     string uuid = (string)item["uuid"];
+                    // Log the data being processed
+                    //AcAp.DocumentManager.MdiActiveDocument.Editor.WriteMessage($"Processing project: Name = {name}, UUID = {uuid}\r\n");
+
+                    if (ProjectNameUUidPairs.ContainsKey(name))
+                    {
+                        // Log duplicate key issue
+                        AcAp.DocumentManager.MdiActiveDocument.Editor.WriteMessage($"Duplicate key detected: Name = {name}, UUID = {uuid} Will skip it\r\n");
+                        continue; // Skip adding this entry if you want to avoid duplicates
+                    }
+
                     ProjectNameUUidPairs.Add(name, uuid);
                     Projektid.Items.Add(name);
                 }
@@ -1023,15 +1032,47 @@ namespace Infrakit.Windows
                     buildFolderStructure(folder.Uuid, 0);
                 }
 
-                PindadeKaustad.SelectedIndex = 0;
-                PindadeKaustad.SelectionChanged += PindadeKaustad_SelectionChanged;
-                AddOrUpdateDictionaryEntriesFromTextBox("PinnadKaust", PindadeKaustad.Text);
-                AddOrUpdateDictionaryEntriesFromTextBox("PinnadKaustUUid", SurfaceFolderNameUUidPairs[PindadeKaustad.Text]);
+                //PindadeKaustad.SelectedIndex = 0;
+                //PindadeKaustad.SelectionChanged += PindadeKaustad_SelectionChanged;
+                //AddOrUpdateDictionaryEntriesFromTextBox("PinnadKaust", PindadeKaustad.Text);
+                //AddOrUpdateDictionaryEntriesFromTextBox("PinnadKaustUUid", SurfaceFolderNameUUidPairs[PindadeKaustad.Text]);
 
-                TelgedeKaustad.SelectedIndex = 0;
-                TelgedeKaustad.SelectionChanged += TelgedeKaustad_SelectionChanged;
-                AddOrUpdateDictionaryEntriesFromTextBox("TeljedKaust", TelgedeKaustad.Text);
-                AddOrUpdateDictionaryEntriesFromTextBox("TeljedKaustUUid", AlignmentFolderNameUUidPairs[TelgedeKaustad.Text]);
+                //TelgedeKaustad.SelectedIndex = 0;
+                //TelgedeKaustad.SelectionChanged += TelgedeKaustad_SelectionChanged;
+                //AddOrUpdateDictionaryEntriesFromTextBox("TeljedKaust", TelgedeKaustad.Text);
+                //AddOrUpdateDictionaryEntriesFromTextBox("TeljedKaustUUid", AlignmentFolderNameUUidPairs[TelgedeKaustad.Text]);
+
+                //Muudetud kuna tekkis error kui on projekt kus pole ühtegi kausta
+                if (PindadeKaustad.Items.Count > 0)
+                {
+                    PindadeKaustad.SelectedIndex = 0;
+                    AddOrUpdateDictionaryEntriesFromTextBox("PinnadKaust", PindadeKaustad.Text);
+
+                    if (SurfaceFolderNameUUidPairs.TryGetValue(PindadeKaustad.Text, out var uuid))
+                    {
+                        AddOrUpdateDictionaryEntriesFromTextBox("PinnadKaustUUid", uuid);
+                    }
+                    else
+                    {
+                        AddOrUpdateDictionaryEntriesFromTextBox("PinnadKaustUUid", ""); // Handle missing key appropriately
+                    }
+                }
+
+                if (TelgedeKaustad.Items.Count > 0)
+                {
+                    TelgedeKaustad.SelectedIndex = 0;
+                    AddOrUpdateDictionaryEntriesFromTextBox("TeljedKaust", TelgedeKaustad.Text);
+
+                    if (AlignmentFolderNameUUidPairs.TryGetValue(TelgedeKaustad.Text, out var uuid))
+                    {
+                        AddOrUpdateDictionaryEntriesFromTextBox("TeljedKaustUUid", uuid);
+                    }
+                    else
+                    {
+                        AddOrUpdateDictionaryEntriesFromTextBox("TeljedKaustUUid", ""); // Handle missing key appropriately
+                    }
+                }
+
             }
             catch (WebException webEx)
             {
@@ -1746,6 +1787,11 @@ namespace Infrakit.Windows
         {
             XmlNamespaceManager nsmgr = new XmlNamespaceManager(xmldoc.NameTable);
             nsmgr.AddNamespace("LandXML", "http://www.landxml.org/schema/LandXML-1.2");
+
+
+            // Remove PipeNetworks from Surfaces and Alignments
+            XmlNode pipeNetworksNode = xmldoc.SelectSingleNode("//LandXML:PipeNetworks", nsmgr);
+            pipeNetworksNode?.ParentNode?.RemoveChild(pipeNetworksNode);
 
             if (tagName == "Alignment")
             {

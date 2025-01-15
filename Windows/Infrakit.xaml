@@ -5,7 +5,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:Infrakit.Windows"
              mc:Ignorable="d" 
-             Title="Infrakit settings v.1.0" 
+             Title="Infrakit settings v.1.0.2" 
              Height="555" 
              Width="520"
              ResizeMode="NoResize" 
@@ -88,6 +88,7 @@
             <TextBlock Text="Folder to save surfaces" Grid.ColumnSpan="3" Margin="4,316,361,99" Grid.Row="2" />
             <Button x:Name="BtnNameValiPinnadKaust" Content="Browse folder" HorizontalAlignment="Left" Height="20" Margin="78,315,0,0" VerticalAlignment="Top" Width="95" Click="BtnValiPinnadKaust" ToolTip="Button to select a folder" Grid.Row="2" Grid.Column="2"/>
             <TextBox x:Name="PinnaKaust" HorizontalAlignment="Left" Height="20" Margin="4,340,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="235" TextChanged="PinnaKaust_TextChanged" ToolTip="Folder where surface xml are saved. When empty then to DWG folder." Grid.Row="2" Grid.ColumnSpan="3"/>
+            <!--<Button x:Name="BtnNameLaePinnadUlesse" Content="Upload surfacesOLD" Height="25" Margin="5,400,376,0" VerticalAlignment="Top" Click="BtnLaePinnadUlesse" ToolTip="Surfaces xml files are saved to surfaces folder and uploaded to selected project folder." Grid.Row="2" Grid.ColumnSpan="3"/>-->
             <Button x:Name="BtnNameLaePinnadUlesseUus" Content="Upload surfaces" Height="25" Margin="4,370.333,390.667,0" VerticalAlignment="Top" Click="BtnLaePinnadUlesseUus" ToolTip="Surfaces xml files are saved to surfaces folder and uploaded to selected project folder." Grid.Row="2" Grid.ColumnSpan="3" Width="105"/>
 
             <TextBlock Text="Folder to save aligmnets" Margin="188,314,108,99" Grid.Column="2" Grid.Row="2" />
